@@ -1,7 +1,0 @@
-setVel(1,0);
-sleep(1000);
-setVel(1,3);
-sleep(3000);
-setVel(1,-3);
-sleep(3000);
-setVel(1,0);
