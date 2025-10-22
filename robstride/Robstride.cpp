@@ -869,6 +869,11 @@ void RobStride_Motor::stop()
 	Disenable_Motor(0);
 }
 
+void RobStride_Motor::setPosToZero() 
+{
+	Set_ZeroPos();
+}
+
 
 float RobStride_Motor::getPosition() const 
 {

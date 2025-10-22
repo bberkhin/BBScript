@@ -21,12 +21,12 @@ MotorUARTOdrive::MotorUARTOdrive(uint32_t id) : id_(id)
   }
 */
 }
-
+/*
 uint8_t MotorUARTOdrive::getId() const
 {
     return id_; 
 }
-
+*/
 MotorUARTOdrive::~MotorUARTOdrive()
 {
 }
@@ -47,6 +47,11 @@ void MotorUARTOdrive::stop()
     
 }
  
+void MotorUARTOdrive::setPosToZero() 
+{
+	
+}
+
 bool MotorUARTOdrive::request(uint16_t what, uint16_t wait_ms)
 {
   return false;

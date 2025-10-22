@@ -27,6 +27,8 @@ enum ODriveCMD
   ODriveCMD_SETVELOCITY = 0x00D,
   ODriveCMD_IQ          = 0x014,
   ODriveCMD_CLEARERROR = 0x018,
+  ODriveCMD_SETZERO =    0x019
+
   
 };
 
@@ -132,6 +134,15 @@ void MotorCanOdrive::stop()
   setStateIdle();
   //setCloseLoop();
 }
+
+void MotorCanOdrive::setPosToZero() 
+{  
+  uint8_t buf[8] = {};
+  float Position = 0;
+  can_set_signal_raw<float>(buf, Position, 0, 32, true);
+  sendMsgBuf((CAN_ID << rNodeIdShift) | ODriveCMD_SETZERO, 0, 0, 8, buf);  
+}
+
 
 float MotorCanOdrive::getPosition() const
 {

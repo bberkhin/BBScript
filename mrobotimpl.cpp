@@ -55,33 +55,15 @@ bool MRobot::Load(rapidxml::xml_node<> *robot_node)
         print_terminal ("Robot name: %s\n", name->value());
     }
 
+    JointController * jc = dynamic_cast<JointController *>(jointController_.get());
     
     // Пробегаемся по элементам <joint>
-    for (auto* joint_node = robot_node->first_node("joint"); joint_node;joint_node = joint_node->next_sibling("joint")) {
-        
-        if (auto* xjoint_name = joint_node->first_attribute("name")) 
-            joint_name = xjoint_name->value();
-        else
-            joint_name = "joint";
-        if (auto* xjoint_m = joint_node->first_attribute("motor")) 
-            joint_motor = xjoint_m->value();
-        else
-            joint_motor = "can_odrv";
-        if (auto* xjoint_r = joint_node->first_attribute("ratio")) 
-            ratio = atof(xjoint_r->value());
-        else
-            ratio = 1;
-    
-        if (auto* xjoint_id = joint_node->first_attribute("id")) 
-            id = atoi(xjoint_id->value());
-        else
-            id++;
-
-        print_terminal ("Joint: %s type: %s ratio: %f \n",joint_name.c_str(), joint_motor.c_str(), ratio );
-        jointController_->addJoint(id, joint_motor.c_str(),joint_name.c_str(), ratio);
+    for (auto* joint_node = robot_node->first_node("joint"); joint_node;joint_node = joint_node->next_sibling("joint")) {        
+        jc->addJoint(joint_node);        
     }
     return true;
 }
+
 
 bool MRobot::pumpEvents(ICanInterface *can)
 {
@@ -210,13 +192,13 @@ void JointController::for_each_joint_const(const JointPtrFunctor &fn) const
 }
 
 */
-JointPtr JointController::addJoint( uint8_t id,  const char *motor_type, const char *name, double ratio)
+JointPtr JointController::addJoint(rapidxml::xml_node<>* nd)
 {
-    JointPtr jnt = std::make_shared<Joint>(id, motor_type, name, ratio);
+    JointPtr jnt = std::make_shared<Joint>(int8_t(joints_.size()), nd );
     joints_.push_back(jnt);
     return jnt;    
-}
 
+}
 
 JointPtr JointController::getJointByIndex(uint8_t index)
 {
@@ -259,25 +241,81 @@ Joint::Joint()
 {
 }
 
-Joint::Joint(uint8_t motor_id, const char *motor_type, const char *name, double ratio) : 
-     name_(name && *name ? name : "joint"), ratio_(ratio)
+Joint::Joint(uint8_t index, rapidxml::xml_node<>* joint_node) : 
+     index_(index)
 {
-    if ( motor_type != nullptr && *motor_type != 0 )
-        motor_ = createMotorDriver(motor_type, motor_id); 
+
+    std::string motor_type;
+    static int motor_id = 0;
+    if (auto* xjoint_name = joint_node->first_attribute("name")) 
+        name_ = xjoint_name->value();
+    else
+        name_ = "joint";
+    if (auto* xjoint_m = joint_node->first_attribute("motor")) 
+        motor_type = xjoint_m->value();
+    else
+        motor_type = "can_odrv";
+    if (auto* xjoint_r = joint_node->first_attribute("ratio")) 
+        ratio_ = atof(xjoint_r->value());
+    else
+        ratio_ = 1;
+
+    if (auto* xjoint_id = joint_node->first_attribute("id")) 
+        motor_id = atoi(xjoint_id->value());
+    else
+        motor_id++;
+   
+    // read limits
+    readLimits( joint_node );
+
+    if ( !motor_type.empty()  )
+        motor_ = createMotorDriver(motor_type.c_str(), motor_id); 
+    
+    print_terminal ("Joint: %s type: %s ratio: %f \n",name_.c_str(), motor_type.c_str(), ratio_ );
 }
 
-Joint::Joint( IMotorDriver *motor, const char *name, double ratio) : 
-    name_(name && *name ? name : "joint"), ratio_(ratio)
+Joint::Joint( uint8_t index, IMotorDriver *motor, const char *name, double ratio) : 
+    index_(index), name_(name && *name ? name : "joint"), ratio_(ratio)
 {
     motor_.reset(motor);    
 }
 
+bool Joint::readLimits( rapidxml::xml_node<> *jnt_node )
+{
+//   <limit lower="-10" upper="10" effort="10" velocity="5"/>
+    auto* limit_node = jnt_node->first_node("limit");
+    if ( !limit_node )
+        return false;
 
-void Joint::setVelocity(float target)
+    rapidxml::xml_attribute<> *a = jnt_node->first_attribute("lower");
+    limits_.pos_min_ = a ? atof( a->value() ) : 0.f;
+    a = jnt_node->first_attribute("upper");
+    limits_.pos_max_ = a ? atof( a->value() ) : 0.f;
+    a = jnt_node->first_attribute("effort");
+    limits_.max_torq_ = a ? atof( a->value() ) : 0.f;
+    a = jnt_node->first_attribute("velocity");
+    limits_.vel_max_ = a ? atof( a->value() ) : 0.f;
+    return true;      
+}
+
+
+float Joint::velocityJointToMotor(float veljnt)
+{
+    return veljnt * ratio_;
+}
+
+float Joint::positionJointToMotor(float pos_jnt)
+{
+    return pos_jnt * ratio_;
+}
+
+void Joint::setVelocity(float veljnt)
 {
     if(motor_)
     {
-        motor_->setVelocity(target * ratio_);
+        if ( limits_.vel_max_ > 0.0f)
+            veljnt = std::min( veljnt, limits_.vel_max_ );
+        motor_->setVelocity(velocityJointToMotor(veljnt));
     }
 }
 
@@ -285,7 +323,12 @@ void Joint::setPosition(float target)
 {
     if(motor_)
     {
-        motor_->setPosition(target * ratio_, 10);
+        float actual_vel = ( limits_.vel_max_ > 0.0f) ? limits_.vel_max_ : LIMIT_DEFAULT_VEL;
+        if ( limits_.pos_min_ != 0.0f)
+            target = ( target < limits_.pos_min_) ? limits_.pos_min_ : target;
+        if ( limits_.pos_max_ != 0.0f)
+            target = ( target > limits_.pos_max_) ? limits_.pos_max_ : target;
+        motor_->setPosition( positionJointToMotor(target), actual_vel );
     }
 }
 
@@ -297,18 +340,22 @@ IMotorDriver* Joint::getMotorDriver()
 
 bool Joint::getFeedback( FeedbackJoint *fb) 
 {
+    fb->index = index_;
     if ( motor_  )
     {
-        fb->id = motor_->getId();
         fb->pos = motor_->getPosition() / ratio_;
         fb->vel = motor_->getVelocity() / ratio_;
         return true;
     }
     else
     {
-        fb->id = 0;
         fb->pos = 0.;
         fb->vel = 0.;
     }
     return false;
+}
+
+void Joint::setLimits(JointLimit &l)
+{
+    limits_ = l;
 }

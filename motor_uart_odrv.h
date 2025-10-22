@@ -10,11 +10,12 @@ class MotorUARTOdrive : public IMotorDriver
 {   
 public:
     MotorUARTOdrive(uint32_t id = 0);
-    uint8_t getId() const override;
+   // uint8_t getId() const override;
     virtual ~MotorUARTOdrive();
     void setPosition(float position, float velocity_feedforward) override;
     void setVelocity(float velocity) override;
     void stop()  override;
+    void setPosToZero()  override;
 
     float getPosition() const override;
     float getVelocity() const override;

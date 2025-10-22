@@ -2,6 +2,7 @@
 #include <fstream>
 #include <cstdio>
 #include "script_bind.h"
+#include "mrobotimpl.h"
 
 
 // Глобальные переменные
@@ -9,6 +10,7 @@
 FileManager *g_mainWnd = nullptr;
 SyncExchange *FileManager::gui_run_data = nullptr;
 void run_programm(const std::string &input );
+extern MRobot g_robot_;
 
 
 StatusBar::StatusBar(int X, int Y, int W, int H, int num_lines)
@@ -115,6 +117,8 @@ fs::path MyFileBrowser::getDir() const {
 #define BORDER_W 4
 #define BORDER_H 8
 
+
+
 FileManager::FileManager(int W, int H, SyncExchange *g_r_d, const char* L)
     :  Fl_Window(W, H, L)
 {
@@ -185,12 +189,23 @@ FileManager::FileManager(int W, int H, SyncExchange *g_r_d, const char* L)
     //int grp_y = 40, grp_h = MAX_JOINTS * SL_HEIGHT + (MAX_JOINTS - 1) * SL_SPACING + 2 * SL_Y0;
     //Fl_Group *slider_group = new Fl_Group(10, grp_y, SL_WIDTH, grp_h);
 
+    IJointController *cntrl = g_robot_.getJointController();
     for (int i = 0; i < MAX_JOINTS; ++i) {
+        JointPtr jnt = cntrl->getJointByIndex(i);
+        if ( !jnt )
+            break;
         int sy = SL_Y0 + i * (SL_HEIGHT + SL_SPACING);
-        Fl_Slider* slider = new Fl_Slider(SL_X, sy, SL_WIDTH, SL_HEIGHT);
+        Fl_Hor_Value_Slider* slider = new Fl_Hor_Value_Slider(SL_X, sy, SL_WIDTH, SL_HEIGHT, jnt->getName().c_str() );
         slider->type(FL_HOR_NICE_SLIDER);
-        slider->bounds(-1, 1);
+        const JointLimit& limits = jnt->getLimits();
+        if ( limits.pos_min_ != limits.pos_max_ )
+           slider->bounds(limits.pos_min_, limits.pos_max_);
+        else
+            slider->bounds(-1, 1);
+        slider->user_data((void*)(intptr_t)i);
         slider->value(0);
+        slider->align(FL_ALIGN_LEFT);
+
         slider->callback(slider_cb, (void*)(intptr_t)i);
         sliders.push_back(slider);
     }
@@ -383,9 +398,9 @@ void FileManager::save_cb(Fl_Widget*, void *data) {
 
 void FileManager::slider_cb(Fl_Widget* w, void* data) {
     int idx = (int)(intptr_t)data;    
-    double pos = ((Fl_Slider*)w)->value();
-    mr_setpos(idx+1, pos);  // IMotorDriver::setTargetPosition(double position) override;
-    printf("Joint #%d: %.5f\n", idx+1, ((Fl_Slider*)w)->value());
+    double pos = ((Fl_Hor_Value_Slider*)w)->value();
+    mr_setpos(idx, pos);  // IMotorDriver::setTargetPosition(double position) override;
+    printf("Joint #%d: %.5f\n", idx, ((Fl_Hor_Value_Slider*)w)->value());
 }
 
 
@@ -403,16 +418,13 @@ void FileManager::setFeedback(const FeedbackGUIData  &map_data)
         data += std::to_string(fb.pos);
         data += " Vel: ";
         data += std::to_string(fb.vel);
-        setStatusText(index++, data.c_str() );
-        if ( index >= MAX_JOINTS)
-            break;
-        /*
-        if ( fb.id > 0 && fb.id <= sliders.size() )
+        setStatusText(index++, data.c_str() );            
+        if ( fb.index >= 0 && fb.index < sliders.size() )
         {
-            Fl_Slider *sl = sliders.at(fb.id - 1);
+            Fl_Hor_Value_Slider *sl = sliders.at(fb.index );
             sl->value(fb.pos);
         }
-        */    
+            
     }
 }
 

@@ -10,7 +10,7 @@
 #include <FL/Fl_Box.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Tabs.H>
-#include <FL/Fl_Slider.H>
+#include <FL/Fl_Hor_Value_Slider.H>
 #include <vector>
 #include <string>
 #include <filesystem>
@@ -18,6 +18,8 @@
 #include <condition_variable>
 #include <atomic>
 #include <map>
+
+
 
 #define MAX_FILE_EDIT_SIZE 1024
 #define MAX_FILE_LINE_SIZE 128
@@ -108,7 +110,7 @@ private:
     Fl_Multiline_Input *editor;
     StatusBar *status_bar;
     Fl_Tabs *tabs;
-    std::vector<Fl_Slider*> sliders;
+    std::vector<Fl_Hor_Value_Slider*> sliders;
     std::string selected_file;
     static SyncExchange *gui_run_data;
 };

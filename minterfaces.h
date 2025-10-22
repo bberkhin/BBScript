@@ -78,7 +78,6 @@ struct JointsAngelses
 struct FeedbackJoint
 {
     int index;
-    uint8_t id;
     float pos = 0;
     float vel = 0;
 };
@@ -114,7 +113,6 @@ public:
     virtual ~IJointController() = default;
     virtual void setJointTargets(const JointsAngelses &targets) = 0;
     virtual void update() = 0;
-    virtual JointPtr addJoint(uint8_t id, const char *motor_type, const char *name, double ratio = 1)  = 0;
     virtual JointPtr getJointByMotor( IMotorDriver *p ) = 0;
     virtual JointPtr getJointByIndex(uint8_t index) = 0;
     virtual int getJointsCount() = 0;
@@ -126,27 +124,42 @@ public:
 
 
 // Интерфейс сустава (joint)
+struct JointLimit
+{
+    JointLimit() {}
+    JointLimit(float pos_min,float pos_max,float vel_max = 0.0f, float max_torq = 0.0f ) :
+        pos_min_(pos_min), pos_max_(pos_max), vel_max_(vel_max), max_torq_(max_torq)  {}
+    float pos_min_ = 0.f;
+    float pos_max_ = 0.f;
+    float vel_max_ = 0.f;
+    float max_torq_ = 0.f;
+};
 
 class IJoint {
 public:
     virtual ~IJoint() = default;
     virtual const std::string &getName() const = 0;
+    virtual uint8_t getIndex() const = 0;
     virtual void setVelocity(float velocity) = 0;
     virtual void setPosition(float position) = 0;
     virtual IMotorDriver* getMotorDriver() = 0;
     virtual bool getFeedback( FeedbackJoint *fb) = 0; // joint feedback considering ratio
-protected:
+    virtual const JointLimit& getLimits() const = 0;
+    virtual void setLimits( JointLimit& ) = 0;
 };
+
 
 class IMotorDriver {
 public:
     virtual ~IMotorDriver() = default;
-    virtual uint8_t getId() const = 0;
+    //virtual uint8_t getId() const = 0;
 
     // Управление мотором
     virtual void setPosition(float position, float velocity_feedforward) = 0;
     virtual void setVelocity(float velocity) = 0;
     virtual void stop() = 0;
+    virtual void setPosToZero() = 0;
+
 
     // Чтение состояния мотора
     virtual float getPosition() const = 0;
