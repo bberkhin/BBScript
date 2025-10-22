@@ -6,34 +6,6 @@ PCanImpl *PCanImpl::getGlobalCan()
     return &global_can;
 }
 
-/*    
-   
-    rc = slcan_open_channel(port);
-    if (rc < 0) {
-        fprintf(stderr, "+++ error: slcan_open_channel returnd %i (%i)\n", rc, errno);
-        goto teardown;
-    }
-    while (running) {
-        usleep(10);
-    }
-    fputc('\n', stdout);
-    rc = slcan_close_channel(port);
-    if (rc < 0) {
-        fprintf(stderr, "+++ error: slcan_close_channel returnd %i (%i)\n", rc, errno);
-        goto teardown;
-    }
-    rc = slcan_version_number(port, &hw, &sw);
-    if (rc >= 0) {
-        fprintf(stdout, "!!! hardware: %u.%u\n!!! firmware: %u.%u\n", (hw >> 4), (hw & 0x0F), (sw >> 4), (sw & 0x0F));
-    }
-    rc = slcan_serial_number(port, &sn);
-    if (rc >= 0) {
-        fprintf(stdout, "!!! serial number: %X\n", sn);
-    }
-
-}
-    */
-
 PCanImpl::PCanImpl() : is_open_(false)
 {
     port = slcan_create(8U);
