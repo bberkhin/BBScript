@@ -4,25 +4,42 @@
 #include <iomanip>
 #include <thread>
 
-
-void print_terminal(const char *fmt, ...);
-
-void print_prompt()
+// Версия, принимающая va_list напрямую
+std::string vprint_to_string(const char *fmt, va_list va, bool addcr)
 {
-    printf("BBScript>> ");
-    fflush(stdout);
+    int size = vsnprintf(nullptr, 0, fmt, va);
+    std::string result(size, '\0');
+    vsnprintf(result.data(), result.size() + 1, fmt, va);
+    if ( addcr )
+        result += '\n';
+    return result;
 }
-int fatal_error(const char *fmt, ...);
 
-void print_terminal(const char *fmt, ...)
+void messageToQuery(uint8_t type, std::string &s)
 {
-	va_list va;
-	va_start(va, fmt);
-    vfprintf(stdout, fmt, va);
-	va_end(va);
-    fprintf(stdout, "\n" );
-    fflush(stdout);
+    std::lock_guard<std::mutex> lock(terminal_q.mtx);
+    terminal_q.messages.push(s);
 }
+
+// print_terminal вызывает vprint_to_string напрямую — без копирования аргументов
+void print_terminal(uint8_t type, const char *fmt, ...)
+{
+    va_list va;
+    va_start(va, fmt);
+    std::string s = vprint_to_string(fmt, va, true);
+    va_end(va);
+    messageToQuery(type, s );
+}
+
+
+extern "C" void print_gram_error(const char *err_pfx, const char *fmt, va_list va)
+{
+    std::string s(err_pfx);
+    s += vprint_to_string(fmt, va, true);
+    messageToQuery(MSG_TYPE_ERROR, s );
+}
+
+
 
 int fatal_error(const char *fmt, ...)
 {

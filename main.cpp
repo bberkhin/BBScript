@@ -37,6 +37,13 @@ const char *xmlBuffer =
 
 MRobot g_robot_;
 
+
+void print_prompt()
+{
+    printf("BBScript>> ");
+    fflush(stdout);
+}
+
 int main(int argc, char *argv[]) 
 {
 	//open COM2 
@@ -72,11 +79,11 @@ int main(int argc, char *argv[])
 		com->setBaudrate(baudrate);
 		com->open();
 		if ( !com->isOpen() )  {
-			fatal_error("Failed to open COM port\n");
+			fatal_error("Failed to open COM port");
 			return 1;
 		}
 		else {
-			print_terminal("COM port opened successfully\n");
+			print_terminal("COM port opened successfully");
 		}
 	}
 	catch(const std::exception& e)
@@ -88,7 +95,7 @@ int main(int argc, char *argv[])
 	// Initialize parser
 	if ( parser_intit() != 0 ) {
 		com->close();
-		fatal_error("Failed to initialize parser\n");
+		fatal_error("Failed to initialize parser");
 		return 1;
 	}
 

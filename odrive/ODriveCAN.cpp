@@ -185,7 +185,7 @@ void ODriveCAN::onReceive(uint32_t id, uint8_t length, const uint8_t* data) {
             if (axis_state_callback_ != nullptr)
                 axis_state_callback_(status, axis_state_user_data_);
             else
-                print_terminal("missing callback");
+                print_terminal(MSG_TYPE_DEBUG, "missing callback");
             break;
         }
         case Get_Temperature_msg_t::cmd_id: {

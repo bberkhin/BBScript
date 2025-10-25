@@ -34,9 +34,9 @@ size_t StatusBar::line_count() const {
 
 void StatusBar::draw() {
     fl_push_clip(x(), y(), w(), h());
-    fl_color(FL_LIGHT2);
+    fl_color(bg_clr);
     fl_rectf(x(), y(), w(), h());
-    fl_color(FL_BLACK);
+    fl_color(txt_clr);
     fl_font(FL_HELVETICA, 14);
     int base_y = y() + 18;
     int line_height = 20;
@@ -116,32 +116,31 @@ fs::path MyFileBrowser::getDir() const {
 #define HEADER_TAB_H 25
 #define BORDER_W 4
 #define BORDER_H 8
+#define STATUS_ZONE_W 200
 
 
-
-FileManager::FileManager(int W, int H, SyncExchange *g_r_d, const char* L)
-    :  Fl_Window(W, H, L)
+Fl_Group *FileManager::CreateProgrammTab(int x, int y, int W, int H )
 {
-    FileManager::gui_run_data = g_r_d;
-    begin();
-
-
-    int tabs_h = H - STATUS_H;
-    int w_inner = W - 2*BORDER_W;
-
-    tabs = new Fl_Tabs(0, 0, W, tabs_h);
-
     // Programm tab
-    int grp_prg_h = tabs_h - HEADER_TAB_H;
+    int w_inner = W - 2*BORDER_W;
+    int grp_prg_h = H - HEADER_TAB_H;
+    //Fl_Group *programm_tab = new Fl_Group(0, HEADER_TAB_H , W-2, grp_prg_h, "Programm");
     Fl_Group *programm_tab = new Fl_Group(0, HEADER_TAB_H , W, grp_prg_h, "Programm");
     programm_tab->color( FL_MAGENTA );
     programm_tab->begin();
     int hZ = grp_prg_h - BUTTON_H - 2*SPACING_H - BORDER_H ;
-    Fl_Group *vertical_zone = new Fl_Group(BORDER_W, HEADER_TAB_H, w_inner, hZ );
+   // Fl_Group *vertical_zone = new Fl_Group(BORDER_W, HEADER_TAB_H, w_inner, hZ );
+   Fl_Group *vertical_zone = new Fl_Group(0, HEADER_TAB_H, W, hZ );
+    vertical_zone->begin();
     
-    browser = new MyFileBrowser(BORDER_W, HEADER_TAB_H + BORDER_H, w_inner, hZ );
-    editor = new Fl_Multiline_Input(BORDER_W, HEADER_TAB_H + BORDER_H, w_inner, hZ ); 
+    //browser = new MyFileBrowser(BORDER_W, HEADER_TAB_H + BORDER_H, w_inner, hZ );
+    //editor = new Fl_Multiline_Input(BORDER_W, HEADER_TAB_H + BORDER_H, w_inner, hZ ); 
+    browser = new MyFileBrowser(0, HEADER_TAB_H + BORDER_H, W, hZ );
+    editor = new Fl_Multiline_Input(0, HEADER_TAB_H + BORDER_H, W, hZ ); 
     vertical_zone->end();
+
+
+
   
     int btn_w = 110, btn_h = BUTTON_H, spacing = SPACING_H;
     int btn_top = HEADER_TAB_H + BORDER_H + hZ  + SPACING_H ;
@@ -160,11 +159,13 @@ FileManager::FileManager(int W, int H, SyncExchange *g_r_d, const char* L)
     Fl_Box* dummy_h = new Fl_Box(w_inner-2,0,1,1);
     hor_zone->resizable(dummy_h);
 
-    //hor_zone->end();
+    hor_zone->end();
 
 
     programm_tab->end();
     programm_tab->resizable(vertical_zone);
+    //vertical_zone->resizable(browser);
+    //vertical_zone->resizable(editor);
 
         
     browser->callback(browser_cb, this);
@@ -176,13 +177,15 @@ FileManager::FileManager(int W, int H, SyncExchange *g_r_d, const char* L)
     new_btn->callback(new_cb, this);
     save_btn->callback(save_cb, this);
     setMode(modeLIST);
+    return programm_tab;
+}
 
- // Move tab
- 
-    Fl_Group *move_tab = new Fl_Group(0, 30, W, tabs_h - 30, "Move");
+/////////
+Fl_Group *FileManager::CreatMoveTab(int x, int y, int W, int H)
+{
+    Fl_Group *move_tab = new Fl_Group(x, y + 30, W, H - 30, "Move");
 
-
-    Fl_Box* dummy = new Fl_Box(W-1,tabs_h - 31,1,1);
+    Fl_Box* dummy = new Fl_Box(W-1,W - 31,1,1);
     move_tab->resizable(dummy);
 
     // Группа для слайдеров с жёстко фиксированной позицией/размером (НЕ resizable!)
@@ -210,18 +213,39 @@ FileManager::FileManager(int W, int H, SyncExchange *g_r_d, const char* L)
         sliders.push_back(slider);
     }
     //slider_group->end();
-
-
     move_tab->end();
-    tabs->end();
+    return move_tab;
+}    
+//////////
 
+
+FileManager::FileManager(int W, int H, SyncExchange *g_r_d, const char* L)
+    :  Fl_Window(W, H, L)
+{
+    FileManager::gui_run_data = g_r_d;
+    begin();
+
+
+    int tabs_h = H - STATUS_H;
+
+    tabs = new Fl_Tabs(0, 0, W, tabs_h);
+    Fl_Group *programm_tab = CreateProgrammTab(0, HEADER_TAB_H, W - STATUS_ZONE_W, tabs_h);
+    Fl_Group *move_tab = CreatMoveTab(0, 30, W - STATUS_ZONE_W ,tabs_h);
     
+ // Move tab
+   
+    tabs->end();
+   
     status_bar = new StatusBar(10, H - STATUS_H,  W-20, STATUS_H, MAX_JOINTS + 1 );
     status_bar->set_line(0, "");
     status_bar->set_line(1, "No error");
-
-
     
+    feedback_bar = new StatusBar( W-STATUS_ZONE_W, HEADER_TAB_H,  STATUS_ZONE_W, tabs_h -HEADER_TAB_H , MAX_JOINTS + 1 );
+    feedback_bar->set_line(0, "POS");
+    feedback_bar->set_line(1, "VEL");
+    feedback_bar->setColor(  FL_BLACK, FL_GREEN );
+    
+
     resizable(tabs);
     size_range(380, 220);
     end();
@@ -287,8 +311,10 @@ void FileManager::resize(int X, int Y, int W, int H)
 */
 void FileManager::resize(int X, int Y, int W, int H){
     Fl_Window::resize(X, Y, W, H); 
-    if (tabs) tabs->size(W, H - STATUS_H);
+    if (tabs) tabs->size(W - STATUS_ZONE_W, H - STATUS_H);
     if (status_bar) status_bar->resize(0, H - STATUS_H, W, STATUS_H);
+    //if (feedback_bar) feedback_bar->resize( W-STATUS_ZONE_W, 0,  STATUS_ZONE_W,  H - STATUS_H );
+    
     redraw();
 }
 

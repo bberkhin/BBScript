@@ -65,6 +65,10 @@ public:
     void set_lines(const std::vector<std::string>& new_lines);
     size_t line_count() const;
     void draw() override;
+    void setColor( Fl_Color _txt_clr, Fl_Color _bg_clr) {  txt_clr = _txt_clr; bg_clr = _bg_clr; }
+private:
+    Fl_Color txt_clr = FL_BLACK;
+    Fl_Color bg_clr = FL_LIGHT2;
 };
 
 class MyFileBrowser : public Fl_File_Browser {
@@ -97,6 +101,9 @@ public:
     void save_file();
     void setFeedback(const FeedbackGUIData  &data);
 
+    Fl_Group *CreateProgrammTab(int x, int y,int H, int W);
+    Fl_Group *CreatMoveTab(int x, int y, int H, int W);
+
     static void browser_cb(Fl_Widget *w, void *data);
     static void run_cb(Fl_Widget*, void *data);
     static void edit_cb(Fl_Widget*, void *data);
@@ -104,11 +111,14 @@ public:
     static void new_cb(Fl_Widget*, void *data);
     static void save_cb(Fl_Widget*, void *data);
     static void slider_cb(Fl_Widget* w, void* data);
+
+
 private:
     MyFileBrowser *browser;
     Fl_Button *run_btn, *close_btn, *edit_btn, *new_btn, *save_btn;
     Fl_Multiline_Input *editor;
     StatusBar *status_bar;
+    StatusBar *feedback_bar;
     Fl_Tabs *tabs;
     std::vector<Fl_Hor_Value_Slider*> sliders;
     std::string selected_file;

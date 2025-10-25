@@ -24,8 +24,6 @@ static JointPtr getJointByIndex(int index)
     return jctrl->getJointByIndex(index); 
 }
 
-
-
 extern "C" void mr_stop() {
     g_robot_.stop();
 }

@@ -1,9 +1,8 @@
-#include "fltkGUI.h"
+#include "mainwnd.h"
 #include "mrobotimpl.h"
 #include "platform_util.h"
 #include <thread>
 #include <atomic>
-#include <mutex>
 #include <map>
 #include <rapidxml.hpp>
 #include <rapidxml_utils.hpp>
@@ -18,7 +17,7 @@ std::mutex mtx;
 FeedbackGUIData  com_map;
 
 
-
+TerminalQuery terminal_q; 
 
 const char *xmlBuffer =
 "<robot name=\"MyRobot\">"
@@ -39,21 +38,21 @@ void run_programm(const std::string &input )
 {
     try
     {		
+        print_terminal(MSG_TYPE_INFOOK, "Start checking...");
         if ( input.empty() )
             return;
         int res = parser_parse( input.c_str() );	
         if ( res != 0 ) {
-            print_terminal("Syntax error");
+            print_terminal(MSG_TYPE_ERROR, "Stop: Syntax error");
             return;
         }
         int exec_res = parser_execute();
         if ( exec_res != 0 ) {
-            print_terminal("Execution error");            
+            print_terminal(MSG_TYPE_ERROR, "Stop: Execution error");            
         }
     } catch(const std::exception& e)
     {
-        print_terminal("Catch exception: ");
-        print_terminal( e.what() );
+        print_terminal(MSG_TYPE_ERROR, "Catch exception: %s", e.what() );
     }
 }
 
@@ -94,11 +93,45 @@ void feedback_reader_thread()
     }
 }
 
-void timer_callback(void*) {
-    std::lock_guard<std::mutex> lock(mtx);
-    if (g_mainWnd) {
-         g_mainWnd->setFeedback(com_map);
-    }   
+void update_display_cb()
+{
+    while ( !terminal_q.messages.empty() ) {          
+        print_gui_terminal( MSG_TYPE_ERROR, terminal_q.messages.front() );
+        terminal_q.messages.pop();
+    }       
+}
+
+void update_display_cb(void*) {
+    std::queue<std::string> local_queue;
+    
+    // Копируем все сообщения под защитой мьютекса
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        local_queue.swap(terminal_q.messages);
+    }
+    
+    // Обновляем GUI без удержания мьютекса
+    while (!local_queue.empty()) {
+        print_gui_terminal( MSG_TYPE_ERROR, local_queue.front() );        
+        local_queue.pop();
+    }
+    g_mainWnd->redraw();    
+   // Fl::flush();  // применяет обновления немедленно
+}
+
+void timer_callback(void*) 
+{
+    //check feedback
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        g_mainWnd->setFeedback(com_map);
+    }
+    //check terminal
+    {
+        std::lock_guard<std::mutex> lock(terminal_q.mtx);
+        if ( !terminal_q.messages.empty() )
+            Fl::awake(update_display_cb, nullptr); // Потокобезопасный вызов            
+    }
     Fl::repeat_timeout(0.05, timer_callback); // каждые 50 мс
 }
 
@@ -145,14 +178,14 @@ bool init_config()
             can->setPort( s ? s : DEFAULT_COM_PORT );    		
             can->open();
 	    	if ( can->isOpen() )  {
-			    print_terminal("CAN opened successfully");
+			    print_terminal(MSG_TYPE_INFOOK, "CAN opened successfully");
 		    }
             else
-               print_terminal("CAN not opened: %s", s ? s : DEFAULT_COM_PORT );
+               print_terminal(MSG_TYPE_ERROR, "CAN not opened: %s", s ? s : DEFAULT_COM_PORT );
 
         }
         else
-          print_terminal("tag <CAN> not found in config.xml so can not opend");
+          print_terminal(MSG_TYPE_WARNING, "tag <CAN> not found in config.xml so can not opend");
 
         //open COM  <com port="COM5",bound="115200"/>
         rapidxml::xml_node<>* nd_com = root->first_node("com");
@@ -165,23 +198,23 @@ bool init_config()
             if ( attr )
                 s = attr->value();  
             else
-                print_terminal("<port> not found in <com> in  config.xml");
+                print_terminal(MSG_TYPE_WARNING, "<port> not found in <com> in  config.xml");
             com->setPort( s ? s : DEFAULT_COM_PORT );
             attr = nd_com->first_attribute("bound");
             if ( attr ) {
                 s = attr->value();  
             } else {
                 s = nullptr;
-                print_terminal("<bound> not found in <com> in  config.xml");
+                print_terminal(MSG_TYPE_WARNING, "<bound> not found in <com> in  config.xml");
             }
             com->setBaudrate( s ? atoi(s) : DEFAULT_COM_BAUNDRATE );
     		com->open();
 	    	if ( com->isOpen() )  {
-			    print_terminal("COM port opened successfully\n");
+			    print_terminal(MSG_TYPE_INFOOK, "COM port opened successfully");
 		    }
         }
         else
-          print_terminal("tag <COM> not found in config.xml so com port not opend");
+          print_terminal(MSG_TYPE_WARNING,"tag <COM> not found in config.xml so com port not opend");
         // init robot like URDF format 
         rapidxml::xml_node<>* nd_robot = root->first_node("robot");
         if ( !nd_robot )
@@ -197,17 +230,28 @@ bool init_config()
     }
     catch (const rapidxml::parse_error &e) 
     {
-        print_terminal( e.what() );
+        print_terminal(MSG_TYPE_ERROR, e.what() );
     }
     catch(const std::exception& e)
 	{
-		print_terminal( e.what() );
+		print_terminal(MSG_TYPE_ERROR, e.what() );
 	}
     return true;
 }
 
-
+extern int Ww, Wh;
 int main(int argc, char **argv) {
+
+
+    SyncExchange gui_run_data;
+    Fl_Window *window = new Fl_Window(Ww, Wh, "BBRobot UI");
+    window->color(FL_WHITE);
+    g_mainWnd = new MainWnd(0, 0, Ww, Wh,&gui_run_data);
+    window->end();
+    window->resizable(g_mainWnd);
+    window->size_range(Ww, Wh);
+    window->show(argc, argv);
+    window->size(Ww + Ww/2, Wh+Wh);
 
 
     init_config();  	
@@ -217,14 +261,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-    SyncExchange gui_run_data;
-    FileManager win(640, 520,  &gui_run_data,  "File manager (FLTK)" );
-    g_mainWnd = &win;
-    win.show(argc, argv);
-
     std::thread programm_thread( programm_thread_runner, std::ref(gui_run_data) ); 
-
-
     //feedback thread
     std::thread reader(feedback_reader_thread);  
     Fl::add_timeout(0.05, timer_callback); // Пуск таймера

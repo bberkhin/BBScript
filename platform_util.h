@@ -5,12 +5,30 @@
 #include <string>
 #include <stdlib.h>
 #include <cstdarg>
-
-
 #include <serial/serial.h>
+#include <queue>
+#include <mutex>
 
-void print_terminal(const char *fmt, ...);
-void print_prompt();
+
+
+struct TerminalQuery
+{
+    std::mutex mtx;
+    std::queue<std::string> messages;
+};
+
+extern TerminalQuery terminal_q; 
+
+enum MSG_TYPE {
+    MSG_TYPE_INFO = 0,
+    MSG_TYPE_INFOOK = 1,
+    MSG_TYPE_WARNING = 2, 
+    MSG_TYPE_ERROR = 3, 
+    MSG_TYPE_DEBUG = 4 
+};
+
+void print_gui_terminal(uint8_t type, std::string &s);
+void print_terminal( uint8_t type, const char *fmt, ...);
 int fatal_error(const char *fmt, ...);
 void delay_ms( int time_ms );
 unsigned long millis();

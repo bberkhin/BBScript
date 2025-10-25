@@ -52,7 +52,7 @@ bool MRobot::Load(rapidxml::xml_node<> *robot_node)
     uint8_t id = 0;
     // Выводим имя робота
     if (auto* name = robot_node->first_attribute("name")) {
-        print_terminal ("Robot name: %s\n", name->value());
+        print_terminal (MSG_TYPE_DEBUG,"Robot name: %s", name->value());
     }
 
     JointController * jc = dynamic_cast<JointController *>(jointController_.get());
@@ -271,7 +271,7 @@ Joint::Joint(uint8_t index, rapidxml::xml_node<>* joint_node) :
     if ( !motor_type.empty()  )
         motor_ = createMotorDriver(motor_type.c_str(), motor_id); 
     
-    print_terminal ("Joint: %s type: %s ratio: %f \n",name_.c_str(), motor_type.c_str(), ratio_ );
+    print_terminal (MSG_TYPE_DEBUG, "Joint: %s type: %s ratio: %f",name_.c_str(), motor_type.c_str(), ratio_ );
 }
 
 Joint::Joint( uint8_t index, IMotorDriver *motor, const char *name, double ratio) : 
@@ -287,13 +287,13 @@ bool Joint::readLimits( rapidxml::xml_node<> *jnt_node )
     if ( !limit_node )
         return false;
 
-    rapidxml::xml_attribute<> *a = jnt_node->first_attribute("lower");
+    rapidxml::xml_attribute<> *a = limit_node->first_attribute("lower");
     limits_.pos_min_ = a ? atof( a->value() ) : 0.f;
-    a = jnt_node->first_attribute("upper");
+    a = limit_node->first_attribute("upper");
     limits_.pos_max_ = a ? atof( a->value() ) : 0.f;
-    a = jnt_node->first_attribute("effort");
+    a = limit_node->first_attribute("effort");
     limits_.max_torq_ = a ? atof( a->value() ) : 0.f;
-    a = jnt_node->first_attribute("velocity");
+    a = limit_node->first_attribute("velocity");
     limits_.vel_max_ = a ? atof( a->value() ) : 0.f;
     return true;      
 }

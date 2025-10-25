@@ -4,7 +4,7 @@
     <robot name="MyRobot">
         <joint name="Joint1" motor="can_robstride" id="1" ratio="1" />
         <joint name="Joint2" motor="can_odrv" id="2" ratio="1">
-            <limit lower="-1" upper="1" effort="10" velocity="5"/>
+            <limit lower="-1" upper="1" effort="10" velocity="2"/>
         </joint>
         <jjjoint name="Joint2" motor="uart_odrv" id="3" ratio="1" />    
     </robot>

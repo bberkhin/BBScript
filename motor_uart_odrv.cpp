@@ -12,7 +12,7 @@ MotorUARTOdrive::MotorUARTOdrive(uint32_t id) : id_(id)
   //odrv_ = std::make_unique<ODriveCAN>(com_port, id); 
   
   odrv_ = std::make_shared<ODriveUART>(com_port); 
-  print_terminal("Starting ODriveUART Id = %d", id);
+  print_terminal(MSG_TYPE_INFO,"Starting ODriveUART Id = %d", id);
  
   /*
   print_terminal("Waiting for ODrive...");

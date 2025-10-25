@@ -19,7 +19,6 @@ void mr_setvel(int id, double v);  // IMotorDriver::setTargetVelocity(double vel
 void mr_stop();
 extern void mr_delay_ms(int );
 
-
 #ifdef __cplusplus
 };
 #endif

@@ -45,7 +45,8 @@ add_executable(main
     ${FLEX_Lexer_OUTPUTS}
     ${BISON_Parser_OUTPUTS}
     mainGUI.cpp
-    fltkGUI.cpp
+#    fltkGUI.cpp
+    mainwnd.cpp
     mrobotimpl.cpp
     platform_util.cpp
     motors_facoty.cpp

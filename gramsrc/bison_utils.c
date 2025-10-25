@@ -31,6 +31,26 @@ int cl_pedantic = 0;		/* Enable pendatic warnings when set */
 
 int yyparse(void);
 
+void print_gram_error(const char *err_pfx, const char *fmt, va_list va);
+
+static int errorprint(const node_t *n, const char *fmt, const char *pfx, va_list va)
+{
+	int l = linenr;
+	int c = charnr;
+	if(n) {
+		l = n->linenr;
+		c = n->charnr;
+	}
+    int size = snprintf(0, 0, "%s:%d:%d: %s: ", n ? n->filename : filename, l, c, pfx);
+	char *err_pfx = malloc(size+1);
+	snprintf(err_pfx, size, "%s:%d:%d: %s: ", n ? n->filename : filename, l, c, pfx);
+	print_gram_error(err_pfx, fmt, va);	
+	free(err_pfx);
+	return 0;
+}
+
+
+/*
 static int errorprint(const node_t *n, const char *fmt, const char *pfx, va_list va)
 {
 	int l = linenr;
@@ -44,7 +64,7 @@ static int errorprint(const node_t *n, const char *fmt, const char *pfx, va_list
 	fprintf(stderr, "\n");
 	return 0;
 }
-
+*/
 int yyerror(const char *fmt, ...)
 {
 	syntaxerrors++;
