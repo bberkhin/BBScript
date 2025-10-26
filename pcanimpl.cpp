@@ -1,4 +1,5 @@
 #include "pcanimpl.h"
+#include "platform_util.h"
 
 PCanImpl *PCanImpl::getGlobalCan()
 {
@@ -10,7 +11,7 @@ PCanImpl::PCanImpl() : is_open_(false)
 {
     port = slcan_create(8U);
     if (!port) {
-        fprintf(stderr, "+++ error: slcan_create returnd NULL (%i)\n", errno);
+        print_terminal(MSG_TYPE_ERROR, "slcan_create returnd NULL (%i)", errno);
     }
 }
 
@@ -29,31 +30,31 @@ bool PCanImpl::open()
  {
     int rc = slcan_connect(port, port_name_.c_str(), NULL);
     if (rc < 0) {
-        fprintf(stderr, "+++ error: slcan_connect returnd %i (%i)\n", rc, errno);
+        print_terminal(MSG_TYPE_ERROR, "+++ error: slcan_connect returnd %i (%i)", rc, errno);
         return false;
     }
     rc = slcan_set_ack(port, true);
     if (rc < 0) {
-        fprintf(stderr, "+++ error: slcan_set_ack true returnd %i (%i)\n", rc, errno);
+        print_terminal(MSG_TYPE_ERROR, "+++ error: slcan_set_ack true returnd %i (%i)", rc, errno);
         return false;
     }
     rc = slcan_version_number(port, NULL, NULL);
     if (rc < 0) {
         rc = slcan_set_ack(port, false);
         if (rc < 0) {
-            fprintf(stderr, "+++ error: slcan_set_ack false returnd %i (%i)\n", rc, errno);
+            print_terminal(MSG_TYPE_ERROR, "+++ error: slcan_set_ack false returnd %i (%i)", rc, errno);
             return false;
         }
-        fprintf(stdout, "!!! Using CANable protocol (w/o ACK/NACK feedback)\n");
+        print_terminal(MSG_TYPE_INFOOK, "!!! Using CANable protocol (w/o ACK/NACK feedback)");
     }
     rc = slcan_setup_bitrate(port, CAN_1000K);
     if (rc < 0) {
-        fprintf(stderr, "+++ error: slcan_setup_bitrate returnd %i (%i)\n", rc, errno);
+        print_terminal(MSG_TYPE_ERROR, "+++ error: slcan_setup_bitrate returnd %i (%i)", rc, errno);
         return false;
     }
     rc = slcan_open_channel(port);
     if (rc < 0) {
-        fprintf(stderr, "+++ error: slcan_open_channel returnd %i (%i)\n", rc, errno);
+        print_terminal(MSG_TYPE_ERROR, "+++ error: slcan_open_channel returnd %i (%i)", rc, errno);
         return false;
     }
     is_open_ = true;

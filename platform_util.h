@@ -11,10 +11,11 @@
 
 
 
+typedef std::pair<uint8_t,std::string> terminal_msg;
 struct TerminalQuery
-{
+{    
     std::mutex mtx;
-    std::queue<std::string> messages;
+    std::queue<terminal_msg> messages;
 };
 
 extern TerminalQuery terminal_q; 
@@ -27,7 +28,10 @@ enum MSG_TYPE {
     MSG_TYPE_DEBUG = 4 
 };
 
+void init_main_thread_id();
+bool is_main_thread();
 void print_gui_terminal(uint8_t type, std::string &s);
+void print_gui_terminal(uint8_t type, const char *s);
 void print_terminal( uint8_t type, const char *fmt, ...);
 int fatal_error(const char *fmt, ...);
 void delay_ms( int time_ms );

@@ -4,6 +4,16 @@
 #include <iomanip>
 #include <thread>
 
+std::thread::id main_thread_id;
+
+void init_main_thread_id() {
+    main_thread_id = std::this_thread::get_id();
+}
+
+bool is_main_thread() {
+    return std::this_thread::get_id() == main_thread_id;
+}
+
 // Версия, принимающая va_list напрямую
 std::string vprint_to_string(const char *fmt, va_list va, bool addcr)
 {
@@ -18,7 +28,7 @@ std::string vprint_to_string(const char *fmt, va_list va, bool addcr)
 void messageToQuery(uint8_t type, std::string &s)
 {
     std::lock_guard<std::mutex> lock(terminal_q.mtx);
-    terminal_q.messages.push(s);
+    terminal_q.messages.push( std::make_pair(type, s));
 }
 
 // print_terminal вызывает vprint_to_string напрямую — без копирования аргументов
@@ -26,17 +36,23 @@ void print_terminal(uint8_t type, const char *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
-    std::string s = vprint_to_string(fmt, va, true);
+    std::string s = vprint_to_string(fmt, va, false);
     va_end(va);
-    messageToQuery(type, s );
+    if ( is_main_thread() )
+        print_gui_terminal( type, s );
+    else
+        messageToQuery(type, s );
 }
 
 
 extern "C" void print_gram_error(const char *err_pfx, const char *fmt, va_list va)
 {
     std::string s(err_pfx);
-    s += vprint_to_string(fmt, va, true);
-    messageToQuery(MSG_TYPE_ERROR, s );
+    s += vprint_to_string(fmt, va, false);
+    if ( is_main_thread() )
+        print_gui_terminal( MSG_TYPE_ERROR, s );
+    else
+        messageToQuery(MSG_TYPE_ERROR, s );
 }
 
 

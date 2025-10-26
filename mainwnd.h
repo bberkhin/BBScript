@@ -57,7 +57,6 @@ public:
     StatusBar(int X, int Y, int W, int H, int num_lines);
 
     void set_line(size_t idx, const std::string& text);
-    void set_lines(const std::vector<std::string>& new_lines);
     size_t line_count() const;
     void draw() override;
     void setColor( Fl_Color _txt_clr, Fl_Color _bg_clr) {  txt_clr = _txt_clr; bg_clr = _bg_clr; }
@@ -85,6 +84,7 @@ class MainWnd : public Fl_Group
 {
 public:
     MainWnd(int X, int Y, int W, int H, SyncExchange *gui_rd );
+    void configUpdated(); // cal when congfig file loaded and robot configured
 private:
     Fl_Group *CreateEditTab(int x, int y,int W, int H);
     Fl_Group *CreateProgramsTab(int x, int y,int W, int H);
@@ -98,27 +98,25 @@ public:
     void setFeedback(const FeedbackGUIData  &map_data);
     void UpdateStatusLine();
     void show_editor(const std::string& filename, bool is_new);
-    void print_terminal(uint8_t type, const char *s);
+    void print_terminal(uint8_t type, std::string &s);
     void clear_terminal();
     static void slider_cb(Fl_Widget* w, void* data);
     static void browser_cb(Fl_Widget *w, void *data);
-    static void limit_text_cb(int pos, int nInserted, int nDeleted, int nRestyled, const char *deletedText, void *cbArg);
-
+    static void tabs_cb(Fl_Widget* w, void *data);
 
 private:
-    MyFileBrowser *browser;
-    //Fl_Text_Display *terminal;
-    Fl_Terminal *terminal;
-    //Fl_Text_Buffer *tbuf;
-    //Fl_Text_Buffer *sbuf;
-    StatusBar *feedback_bar;
+    MyFileBrowser *browser = nullptr;
+    Fl_Terminal *terminal = nullptr;
+    StatusBar *feedback_bar = nullptr;
+    Fl_Tabs *tabs = nullptr;
+    Fl_Group *edit_tab = nullptr;
+    Fl_Group *browser_tab = nullptr;
+    Fl_Group *move_tab = nullptr;
+    Fl_Multiline_Input *editor = nullptr;
+    Fl_Box *statusline = nullptr;
     std::vector<Fl_Hor_Value_Slider*> sliders;
     std::string selected_file;
     static SyncExchange *gui_run_data;
-    Fl_Tabs *tabs;
-    Fl_Group *edit_tab;
-    Fl_Multiline_Input *editor;
-    Fl_Box *statusline;
         
 };
 

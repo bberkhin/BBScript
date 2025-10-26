@@ -1,5 +1,5 @@
 <app>
-    <com port="COM5" bound="115200"/>
+    <nocom port="COM5" bound="115200"/>
     <can port="COM6" />
     <robot name="MyRobot">
         <joint name="Joint1" motor="can_robstride" id="1" ratio="1" />

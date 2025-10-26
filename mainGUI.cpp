@@ -38,18 +38,21 @@ void run_programm(const std::string &input )
 {
     try
     {		
-        print_terminal(MSG_TYPE_INFOOK, "Start checking...");
+        print_terminal(MSG_TYPE_INFO, "Start checking...");
         if ( input.empty() )
             return;
         int res = parser_parse( input.c_str() );	
         if ( res != 0 ) {
-            print_terminal(MSG_TYPE_ERROR, "Stop: Syntax error");
+            print_terminal(MSG_TYPE_INFO, "Stop: Syntax error");
             return;
         }
         int exec_res = parser_execute();
         if ( exec_res != 0 ) {
-            print_terminal(MSG_TYPE_ERROR, "Stop: Execution error");            
+            print_terminal(MSG_TYPE_INFO, "Stop: Execution error");            
         }
+        else
+            print_terminal(MSG_TYPE_INFOOK, "Program completed successfully");            
+
     } catch(const std::exception& e)
     {
         print_terminal(MSG_TYPE_ERROR, "Catch exception: %s", e.what() );
@@ -93,16 +96,8 @@ void feedback_reader_thread()
     }
 }
 
-void update_display_cb()
-{
-    while ( !terminal_q.messages.empty() ) {          
-        print_gui_terminal( MSG_TYPE_ERROR, terminal_q.messages.front() );
-        terminal_q.messages.pop();
-    }       
-}
-
 void update_display_cb(void*) {
-    std::queue<std::string> local_queue;
+    std::queue<terminal_msg> local_queue;
     
     // Копируем все сообщения под защитой мьютекса
     {
@@ -112,10 +107,10 @@ void update_display_cb(void*) {
     
     // Обновляем GUI без удержания мьютекса
     while (!local_queue.empty()) {
-        print_gui_terminal( MSG_TYPE_ERROR, local_queue.front() );        
+        print_gui_terminal( local_queue.front().first, local_queue.front().second );        
         local_queue.pop();
     }
-    g_mainWnd->redraw();    
+  //  g_mainWnd->redraw();    
    // Fl::flush();  // применяет обновления немедленно
 }
 
@@ -133,6 +128,17 @@ void timer_callback(void*)
             Fl::awake(update_display_cb, nullptr); // Потокобезопасный вызов            
     }
     Fl::repeat_timeout(0.05, timer_callback); // каждые 50 мс
+}
+
+void init_feedback_data()
+{
+    FeedbackJoint data;
+    IJointController* jctrl = g_robot_.getJointController();     
+    std::lock_guard<std::mutex> lock(mtx);    
+    for( data.index = 0; data.index < jctrl->getJointsCount(); data.index++) {
+        JointPtr jnt = jctrl->getJointByIndex(data.index);
+        com_map[ jnt->getName() ] = data;
+    }    
 }
 
 void get_feedback_callback(IMotorDriver *motor,  uint16_t type)
@@ -155,8 +161,12 @@ void get_feedback_callback(IMotorDriver *motor,  uint16_t type)
 bool init_config()
 {
     try
-	{        
-        rapidxml::file<> xmlFile("C:/Projects/BBRobot/BBScript/config.xml");    
+	{   
+        std::string cfg_file = "C:/Projects/BBRobot/BBScript/config.xml";
+        std::string msg("Parse Config: ");
+        msg += cfg_file;
+        print_terminal(MSG_TYPE_INFO, msg.c_str() );
+        rapidxml::file<> xmlFile( cfg_file.c_str() );
         // Создаем и парсим документ
         rapidxml::xml_document<> doc;
         doc.parse<0>(xmlFile.data());
@@ -242,6 +252,7 @@ bool init_config()
 extern int Ww, Wh;
 int main(int argc, char **argv) {
 
+    init_main_thread_id();
 
     SyncExchange gui_run_data;
     Fl_Window *window = new Fl_Window(Ww, Wh, "BBRobot UI");
@@ -260,12 +271,15 @@ int main(int argc, char **argv) {
     	fatal_error("Failed to initialize parser\n");
 		return 1;
 	}
+    init_feedback_data();
+    g_mainWnd->configUpdated();
 
     std::thread programm_thread( programm_thread_runner, std::ref(gui_run_data) ); 
     //feedback thread
     std::thread reader(feedback_reader_thread);  
     Fl::add_timeout(0.05, timer_callback); // Пуск таймера
 
+    
     int err = Fl::run();
     
     keep_running = false;
@@ -278,9 +292,9 @@ int main(int argc, char **argv) {
     }
 
     programm_thread.join();
-
-    
+  
  	parser_clean();
+    delete window;
     return err;
 }
 
