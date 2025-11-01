@@ -32,131 +32,71 @@
 static const char axes[MAXAXES] = "XYZABCUVW";
 #pragma warning(disable:4996)
 
-static int printscalarval(const value_t *v, char tag, int globalref, int relative, int force, int angular)
+
+float value_to_float(const value_t *v)
 {
-	int rv = 0;
-	double coord;
-	double offs = 0.0;
-	double *gpref = NULL;
-	if(globalref >= 0 && globalref < naxes) {
-		offs = *global_offs[globalref] + relative_offs[globalref];
-		gpref = global_pos[globalref];
-	}
+	if(!v)
+		return 0.0;
+	v = value_deref(v);
 	switch(v->type) {
-	default:
-		return 0;
-	case VAL_INT:
-	case VAL_FLOAT:
-		if(angular)
-			coord = value_to_deg(v);
-		else
-			coord = value_to_dist(v);
-		if(gpref) {
-			if(relative) {
-				coord += *gpref;
-				/*
-				 * The coordinate is present and must be output
-				 * to prevent a second call to this function,
-				 * which would cause the absolute position to
-				 * move twice.
-				 * This would happen on relative moves with a
-				 * target coordinate within EPSILON of zero.
-				 */
-				force = 1;
-			} else if(!relative)
-				coord -= *gpref;
-		}
-		if(force || !relative || !gpref || fabs(coord + offs) >= EPSILON) {
-			printf(" %c%.*f", tag, cl_decimals, coord + offs);
-			rv = 1;
-		}
-		if(gpref) {
-			*gpref = coord;
-		}
-		return rv;
+	case VAL_INT:	return (float)v->i;
+	case VAL_FLOAT:	return (float)v->d;
+	default:	return 0.0f;
 	}
 }
 
-static void movegoto(const node_t *ref, const value_t *arg, int mv, const char *fn, int relative, double feed)
+static void movej_(const node_t *ref, const value_t *arg, const char *fn, float feed)
 {
 	int i;
 	int nax = 0;
-    printf("Do Goto(): ");
-	
+	float out_pos[6];	
+	//check arg
 	for(i = 0; i < arg->v.n && i < naxes; i++) {
-		if(i < 3 || i >= 6)
-			check_arg_unit_distance(ref, fn, arg->v.vals[i], 0);
-		else
-			check_arg_unit_angle(ref, fn, arg->v.vals[i], 0);
-		if(printscalarval(arg->v.vals[i], axes[i], i, relative, 0, i >= 3 && i < 6))
+		check_arg_unit_angle(ref, fn, arg->v.vals[i], 0);
+		const value_t *v = arg->v.vals[i];
+		if ( v->type == VAL_INT || v->type == VAL_FLOAT )
+		{
+			out_pos[i] = value_to_float(v); // TODO coord = value_to_rad(v);
 			nax++;
-	}
-	/* If we did not get any output on relative movement, force it */
-	if(!nax && relative) {
-		for(i = 0; i < arg->v.n && i < naxes; i++) {
-			if(printscalarval(arg->v.vals[i], axes[i], i, relative, 1, i >= 3 && i < 6))
-				nax++;
 		}
+		else
+			out_pos[i] = NAN;
 	}
-	
-    if(!nax)
+	for( ; i< naxes; i++)
+		out_pos[i] = NAN;
+		
+    if( !nax )
 		rterror(ref, "All coordinates in %s() undefined", fn);
+	mr_movej(out_pos, feed );
 }
 
-static value_t *robot_goto(const node_t *ref, int argc)
+static value_t *br_movej(const node_t *ref, int argc)
 {
-	value_t *p = bi_position(ref, 0);
 	const value_t *arg;
-	double feed = -1.0;
+	float feed = 0.0f;
 	int i;
-	check_arg_one(ref, "move", argc);
+	check_arg_one(ref, "movej", argc);
 	arg = value_get(argc, 0);
 	if(argc > 1) {
 		const value_t *ff = value_get(argc, 1);
-		check_arg_scalar(ref, "move", ff, 1);
-		feed = value_to_dist(ff);
+		check_arg_scalar(ref, "movej", ff, 1);
+		feed = value_to_float(ff);
 	}
+	else 
+		feed = NAN;
 	if(isvectorlist(arg)) {
 		if(arg->vl.n <= 0)
-			rtwarning(ref, "move(): Vectorlist contains no vectors");
+			rtwarning(ref, "movej(): Vectorlist contains no vectors");
 		for(i = 0; i < arg->vl.n; i++) {
-			movegoto(ref, arg->vl.vecs[i], 1, "move", 0, feed);
+			movej_(ref, arg->vl.vecs[i], "movej", feed);
 		}
 	} else if(isvector(arg))
-		movegoto(ref, arg, 1, "move", 0, feed);
+		movej_(ref, arg, "movej", feed);
 	else
-		rterror(ref, "move(): First argument must be a vector or a vectorlist");
-	return p;
+		rterror(ref, "movej(): First argument must be a vector or a vectorlist");
+	return value_new(VAL_UNDEF);
+
 }
-
-
-
-static value_t *robot_move(const node_t *ref, int argc)
-{
-	value_t *p = bi_position(ref, 0);
-	const value_t *arg;
-	double feed = -1.0;
-	int i;
-	check_arg_one(ref, "move", argc);
-	arg = value_get(argc, 0);
-	if(argc > 1) {
-		const value_t *ff = value_get(argc, 1);
-		check_arg_scalar(ref, "move", ff, 1);
-		feed = value_to_dist(ff);
-	}
-	if(isvectorlist(arg)) {
-		if(arg->vl.n <= 0)
-			rtwarning(ref, "move(): Vectorlist contains no vectors");
-		for(i = 0; i < arg->vl.n; i++) {
-			movegoto(ref, arg->vl.vecs[i], 1, "move", 0, feed);
-		}
-	} else if(isvector(arg))
-		movegoto(ref, arg, 1, "move", 0, feed);
-	else
-		rterror(ref, "move(): First argument must be a vector or a vectorlist");
-	return p;
-}
-
 
 
 static value_t *br_sleep(const node_t *ref, int argc)
@@ -285,7 +225,7 @@ static value_t *br_setPos(const node_t *ref, int argc)
 	check_arg_scalar(ref, "setPos", arg0, 0);
 	check_arg_scalar(ref, "setPos", arg1, 1);
 	int id = value_to_int(arg0);	
-	double d = value_to_double(arg1);
+	float d = value_to_float(arg1);
 	mr_setpos( id, d);
 	return value_new(VAL_UNDEF);	
 }
@@ -300,7 +240,7 @@ static value_t *br_setVel(const node_t *ref, int argc)
 	check_arg_scalar(ref, "setVel", arg0, 0);
 	check_arg_scalar(ref, "setVel", arg1, 1);
 	int id = value_to_int(arg0);	
-	double d = value_to_double(arg1);
+	float d = value_to_float(arg1);
 	mr_setvel( id, d);
 	return value_new(VAL_UNDEF);	
 }
@@ -322,6 +262,7 @@ const builtins_t builtins_robot[] = {
 	{ L"getPos",      br_getPos },
 	{ L"getVel",      br_getVel },
 	{ L"getVoltage",  br_getVoltage },
+	{ L"movej",  	  br_movej },
 	{ L"setIdle",     br_setIdle },
 	{ L"setModePos",  br_setModePos },
 	{ L"setModeVel",  br_setModeVel },

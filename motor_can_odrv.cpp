@@ -19,6 +19,7 @@ enum ODriveCMD
   ODriveCMD_FEEDBACK    = 0x009, // Get Encoder Estimates
   ODriveCMD_ENC_COUNT   = 0x00A, // Get Encoder Count
   ODriveCMD_SETCTRLMODE = 0x00B,
+  ODriveCMD_SPEEDLIMIT = 0x00F, //Set Velocity Limit                                                                                                      |
   ODriveCMD_TEMPERATURE = 0x015, // Get Sensorless Estimates
   ODriveCMD_REBOOT      = 0x016, //  Reboot ODrive
   ODriveCMD_VBUS        = 0x017, // Get Vbus Voltage
@@ -154,17 +155,51 @@ float MotorCanOdrive::getVelocity() const
     return Vel_Estimate;
 }
 
-float MotorCanOdrive::getVoltage() const
+
+float MotorCanOdrive::getParameter( JOINT_MOTOR_PARAM type )
 {
-  return Bus_Voltage;
+
+	switch(type)
+	{
+		case JOINT_MOTOR_SPEEDLIMIT:			        
+        can_bus_->sendMsgBuf( (this->CAN_ID << rNodeIdShift) | ODriveCMD_SPEEDLIMIT, 0, getRTRBit( ODriveCMD_SPEEDLIMIT ),0, nullptr);
+		    awaitMsg(ODriveCMD_SPEEDLIMIT, 100);
+			  return limit_speed_;
+		case JOINT_MOTOR_CURLIMIT:
+			  can_bus_->sendMsgBuf( (this->CAN_ID << rNodeIdShift) | ODriveCMD_SPEEDLIMIT, 0, getRTRBit( ODriveCMD_SPEEDLIMIT ),0, nullptr);
+		    awaitMsg(ODriveCMD_SPEEDLIMIT, 100);
+			  return limit_cur_;
+		case JOINT_MOTOR_ACCLIMIT:
+			return 0.f;
+		case JOINT_MOTOR_VOLTAGE:
+		    request( FB_VBUS,  100 );
+			return Bus_Voltage;
+		case JOINT_MOTOR_CURRENT:			
+			request( FB_IQCURRENT,  100 );
+      return Iq_Measured; //?? Iq_Setpoint		
+	}
+  return 0.f;
 }
 
-
-float MotorCanOdrive::getIqCurrent() const
+// TODO Speed limit 0X7024 or drw.limit_spd.index==0X7017
+void  MotorCanOdrive::setParameter( JOINT_MOTOR_PARAM type, float param )
 {
-  return Iq_Measured; //?? Iq_Setpoint
+  uint8_t buf[8] = {};
+	switch(type)
+	{
+		case JOINT_MOTOR_SPEEDLIMIT:		
+      limit_speed_ = param;
+  	case JOINT_MOTOR_CURLIMIT:
+      if ( type = JOINT_MOTOR_CURLIMIT )
+        limit_cur_ = param;
+      can_set_signal_raw<float>(buf, limit_speed_, 0, 32, true);
+      can_set_signal_raw<float>(buf, limit_cur_, 32, 32, true);
+      sendMsgBuf((CAN_ID << rNodeIdShift) | ODriveCMD_SPEEDLIMIT, 0, 0, 8, buf);
+			break;	
+		case JOINT_MOTOR_ACCLIMIT:
+    	break;				
+	}
 }
-
 
 bool MotorCanOdrive::request(uint16_t what, uint16_t wait_ms)
 {
@@ -278,6 +313,11 @@ bool MotorCanOdrive::onCanMessage(uint32_t id, uint8_t , uint8_t *buf)
           Disarm_Reason = can_get_signal_raw<uint32_t>(buf, 32, 32, true);
               if (feedback_callback_	)
             feedback_callback_( this, FB_ERROR );
+          break;
+      }
+      case ODriveCMD_SPEEDLIMIT:{
+          limit_speed_ = can_get_signal_raw<float>(buf, 0, 32, true);
+          limit_cur_ = can_get_signal_raw<float>(buf, 32, 32, true);
           break;
       }
       default:

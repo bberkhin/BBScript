@@ -23,6 +23,7 @@
 #include <cstdio>
 #include "script_bind.h"
 #include "platform_util.h"
+#include "macroses.h"
 
 
 // window, simplex and arrow dimensions
@@ -54,8 +55,6 @@ static const char* ansi_gray = "\033[90m";
 MainWnd *g_mainWnd = nullptr;
 SyncExchange *MainWnd::gui_run_data = nullptr;
 void run_programm(const std::string &input );
-extern MRobot g_robot_;
-
 
 Fl_Group *MainWnd::CreateEditTab(int x, int y, int W, int H )
 {
@@ -63,7 +62,9 @@ Fl_Group *MainWnd::CreateEditTab(int x, int y, int W, int H )
     //need button /internal tab
     Fl_Group *tI = new Fl_Group(tab1->x() , tab1->y() ,  tab1->w(), tab1->h());//);
     tI->begin();
-    editor = new Fl_Multiline_Input(tI->x(), tI->y(), tI->w(), tI->h() - h_button-4 ); 
+
+    macro_choice = new Fl_Choice(x, y, W, h_button,  "Macro:");
+    editor = new Fl_Multiline_Input(tI->x(), tI->y() + h_button, tI->w(), tI->h() - 2*h_button-4 ); 
     int yb = tI->y() + tI->h() - h_button - 2;
 
     Fl_Group *th = new Fl_Group(tI->x(), yb, 4*btn_w, h_button );//);
@@ -77,6 +78,17 @@ Fl_Group *MainWnd::CreateEditTab(int x, int y, int W, int H )
     tab1->resizable(tI);
     tI->resizable(editor); 
 
+    macro_choice->callback([](Fl_Widget* w, void* data) {
+        Fl_Choice *choice = (Fl_Choice *)w;
+        int index = choice->value();
+        MainWnd* self = static_cast<MainWnd*>(data);
+        const auto& macros = Macroses::getInstance().GetMacros();
+        if (index >= 0 && index < (int)macros.size()) {
+            self->editor->value(macros[index].code.c_str());
+        }
+        self->editor->take_focus();
+
+        }, this);
     run_btn->callback([](Fl_Widget* w, void* data) {
             MainWnd* self = static_cast<MainWnd*>(data);
             self->run_edit();
@@ -141,6 +153,44 @@ Fl_Group *MainWnd::CreateProgramsTab(int x, int y,int W, int H)
 #define SL_Y0 80
 #define SL_X 80
 
+void MainWnd::addMoveButtons(int x, int y,int W, int H, int index)
+{
+    int btnlr_w = 30;
+    Fl_Button *btn_left    = new Fl_Button(x, y, btnlr_w, H, "<<");
+    Fl_Button *btn_right     = new Fl_Button(x + btnlr_w +2, y, btnlr_w, H, ">>");
+    Fl_Float_Input *step     = new Fl_Float_Input(x + 3*(btnlr_w +2) + 5, y, 50, H, "Step:");
+    step->align(FL_ALIGN_LEFT);    
+    JointPtr jnt = g_robot_.getJointController()->getJointByIndex(index);
+    step->value( jnt ? (double)jnt->getStep() : 0.1);
+    btn_left->callback([](Fl_Widget* w, void* data) {
+            int idx = (int)(intptr_t)data;    
+            JointPtr jnt = g_robot_.getJointController()->getJointByIndex(idx);
+            if ( jnt )
+                jnt->moveSteps(-1);
+            }, (void*)(intptr_t)index);
+    btn_left->callback([](Fl_Widget* w, void* data) {
+            int idx = (int)(intptr_t)data;    
+            JointPtr jnt = g_robot_.getJointController()->getJointByIndex(idx);
+            if ( jnt )
+                jnt->moveSteps(1);
+            }, (void*)(intptr_t)index);
+    
+    step->callback([](Fl_Widget* w, void* data) {
+            int idx = (int)(intptr_t)data;  
+            Fl_Float_Input *step = (Fl_Float_Input*)w;
+            // Получаем строку из поля ввода
+            const char *value_str = step->value();
+            JointPtr jnt = g_robot_.getJointController()->getJointByIndex(idx);
+            if ( jnt && value_str && *value_str )
+            {
+                float value = atof(value_str);
+                if ( value != 0.f)
+                    jnt->setStep(value);
+
+            }}, (void*)(intptr_t)index);
+    step->when(FL_WHEN_CHANGED); 
+}
+
 
 Fl_Group *MainWnd::CreateMoveTab(int x, int y,int W, int H)
 {
@@ -169,12 +219,230 @@ Fl_Group *MainWnd::CreateMoveTab(int x, int y,int W, int H)
         slider->callback(slider_cb, (void*)(intptr_t)i);
         
         sliders.push_back(slider);
+        addMoveButtons(SL_X + SL_WIDTH +5, sy, W - SL_X - SL_WIDTH -5, SL_HEIGHT, i ); // <<>> step
     }
     slider_group->end();
     slider_group->resizable(0);
     m_tab->end();
     return m_tab;
 }
+#include "tracerecoder.h"
+
+Fl_Group *MainWnd::CreateRecordTab(int x, int y, int W, int H)
+{
+       //tI->resizable(dummy);
+    Fl_Group *m_tab = new Fl_Group(x,y,W,H, "Record");
+    Fl_Group *ti = new Fl_Group(m_tab->x() , m_tab->y() ,  m_tab->w(), m_tab->h());//);
+
+    int btnlr_hw = 100;
+    
+    Fl_Button *btn_start    = new Fl_Button(x, y, btnlr_hw, btnlr_hw, "Start");
+    Fl_Button *btn_stop     = new Fl_Button(x + btnlr_hw +2, y, btnlr_hw, btnlr_hw, "Stop");
+    Fl_Button *btn_play     = new Fl_Button(x + 2*(btnlr_hw +2), y, btnlr_hw, btnlr_hw, "Play");
+   
+    ti->end();
+    ti->resizable(0);
+    m_tab->end();
+
+    btn_start->callback([](Fl_Widget *w, void *data) {
+        Fl_Button *btnstart  = (Fl_Button *)w;
+        Fl_Button *btnstp  = (Fl_Button *)data;
+        TraceRecorder *tr = TraceRecorder::getInstance();
+        tr->startRecording(); 
+        if ( tr->isRunning() )
+        {
+            btnstart->deactivate();
+            btnstp->activate();
+        } }, btn_stop);
+
+    btn_stop->callback([](Fl_Widget *w, void *data) {
+        Fl_Button *btnstop  = (Fl_Button *)w;
+        Fl_Button *btnstart  = (Fl_Button *)data;
+        TraceRecorder *tr = TraceRecorder::getInstance();
+        tr->stopRecording();         
+        if ( !tr->isRunning() )
+        {
+            btnstart->activate();
+            btnstop->deactivate();
+        }
+        }, btn_start);
+    
+    btn_play->callback([](Fl_Widget *) {
+        TraceRecorder *tr = TraceRecorder::getInstance();
+        tr->playback();         
+        });
+
+
+    return m_tab;
+}
+
+
+bool MainWnd::restoreJointParam(int idx)
+{
+    JointPtr j = g_robot_.getJointController()->getJointByIndex(idx);
+    float val =  j ? j->getParameter(JOINT_MOTOR_SPEEDLIMIT) : 0.f;
+    speedLimit->value(std::to_string(val).c_str());
+    val =  j ? j->getParameter(JOINT_MOTOR_ACCLIMIT) : 0.f;
+    accLimit->value(std::to_string(val).c_str());
+    val =  j ? j->getParameter(JOINT_MOTOR_CURLIMIT) : 0.f;
+    currentLimit->value(std::to_string(val).c_str());
+    motorModified(false);
+    val =  j ? j->getParameter(JOINT_MOTOR_VOLTAGE) : 0.f;
+    voltage->value(std::to_string(val).c_str());   
+    last_motor_choice_idx_ = idx;     
+    return true;
+}
+
+bool MainWnd::saveJointOneParam(JointPtr j, Fl_Float_Input *input, JOINT_MOTOR_PARAM type )
+{
+    float val =  atof ( input->value() );
+    if ( j->isAcceptable( type, val ) )
+    {
+        j->setParameter(type, val );
+    }
+    else
+    {
+        const JointLimit& l = j->getLimits();
+        switch( type)
+        {
+            case JOINT_MOTOR_SPEEDLIMIT: fl_alert( "Invalid speed limit %f\nShould be >= 0.1 and <= %f!",val, l.vel_max_ ); break;
+            case JOINT_MOTOR_ACCLIMIT: fl_alert( "Invalid acceleration limit %f\nShould be >= 0.1 and <= %f!",val, l.acc_max_ ); break;
+            case JOINT_MOTOR_CURLIMIT: fl_alert( "Invalid current limit %f\nShould be >= 0.1 and <= %f!",val, l.cur_max_ ); break;
+        }
+        return false;
+    }
+    return true;
+}
+
+bool MainWnd::saveJointParam(int idx)
+{
+    JointPtr j = g_robot_.getJointController()->getJointByIndex(idx);
+    if ( !j )
+        return true;
+    
+    if ( !saveJointOneParam( j, speedLimit, JOINT_MOTOR_SPEEDLIMIT) )
+        return false;
+    if ( !saveJointOneParam( j, accLimit, JOINT_MOTOR_ACCLIMIT) )
+        return false;
+    if ( !saveJointOneParam( j, currentLimit, JOINT_MOTOR_CURLIMIT) )
+        return false;
+
+    g_mainWnd->motorModified(false);
+    return true;
+}
+
+Fl_Group* MainWnd::CreateMotorTab(int xs, int ys, int Ws, int Hs) {
+    Fl_Group *motorTab = new Fl_Group(xs, ys, Ws, Hs, "Motor");
+    Fl_Group *ti = new Fl_Group(motorTab->x() , motorTab->y() ,  motorTab->w(), motorTab->h());//);
+
+
+    // ComboBox with available motors
+    int x = xs + 130;
+    int W = Ws - 135;
+    int y = ys + 20;
+    motor_choice = new Fl_Choice(x, y, W, h_button, "Joints:");
+
+    IJointController *cntrl = g_robot_.getJointController();
+    for (int i = 0; i < MAX_JOINTS; ++i) {
+        JointPtr jnt = cntrl->getJointByIndex(i);
+        if ( !jnt )
+            break;
+        std::string fullname = jnt->getName();
+        IMotorDriver *m = jnt->getMotorDriver();
+        if ( m )
+        {
+            fullname += " ";
+            fullname += jnt->getMotorDriver()->getType();
+        }                     
+        motor_choice->add( fullname.c_str() );
+    }
+    
+    // Speed Limit Input
+    y += (h_button +10);
+    speedLimit = new Fl_Float_Input(x, y, 100, h_button, "Speed Limit:");
+    speedLimit->align(FL_ALIGN_LEFT);
+
+    // Acceleration Limit Input
+    y += (h_button +10);
+    accLimit = new Fl_Float_Input(x, y, 100, h_button, "Acceleration Limit:");
+    accLimit->align(FL_ALIGN_LEFT);
+
+    // Current Limit Input
+    y += (h_button +10);
+    currentLimit = new Fl_Float_Input(x, y, 100, h_button, "Current Limit:");
+    currentLimit->align(FL_ALIGN_LEFT);
+    
+     // Current Limit Input
+    y += (h_button +10);
+    voltage = new Fl_Float_Input(x, y, 100, h_button, "Voltage:");
+    voltage->align(FL_ALIGN_LEFT);
+    voltage->deactivate();
+    
+
+    W = 100;
+    x = ti->x()+1;
+    y += (h_button +50);
+    //y = ti->y() + ti->h() - h_button - 2;
+    // Buttons
+    Fl_Button *saveBtn = new Fl_Button(x, y, W, h_button, "Save");
+    Fl_Button *restoreBtn = new Fl_Button(x + 10 + W, y, W, h_button, "Restore");
+    
+
+    ti->end();
+    ti->resizable(0);
+    motorTab->end();
+
+    // State for tracking modifications
+    
+    motorModified(false);
+
+    // Callback for motor selection
+    //motor_choice->when(FL_WHEN_CHANGED);
+    motor_choice->callback([](Fl_Widget *w) {      
+        auto m_choice = (Fl_Choice *)w;
+        auto new_idx = static_cast<Fl_Choice*>(w)->value();
+
+        if ( g_mainWnd->motorModified() ) {
+            int result = fl_choice("Parameters have changed. Save changes?", "Cancel", "Don't Save", "Save");
+            if ( result == 2 ) { // Save
+                if ( !g_mainWnd->saveJointParam( g_mainWnd->lastMotorChoice() ) )
+                {
+                    m_choice->value( g_mainWnd->lastMotorChoice());
+                    return;
+                }
+            } else if (result == 0) { // Cancel, do not switch motor
+                m_choice->value(g_mainWnd->lastMotorChoice());
+                return;
+            }
+        // If Don't Save, just continue
+        }      
+        g_mainWnd->restoreJointParam(new_idx);
+
+    });
+
+    // Callbacks for data modification (any field edit)
+    auto changed_cb = [](Fl_Widget* w, void* data) {
+        g_mainWnd->motorModified(true);
+    };
+    speedLimit->callback(changed_cb);
+    accLimit->callback(changed_cb);
+    currentLimit->callback(changed_cb);
+
+    // Restore button callback
+    restoreBtn->callback([](Fl_Widget* w, void* data) {
+        int idx = g_mainWnd->motor_choice->value();
+        g_mainWnd->restoreJointParam(idx);
+    });
+
+    // Save button callback
+    saveBtn->callback([](Fl_Widget* w, void* data) {
+        int idx = g_mainWnd->motor_choice->value();
+        g_mainWnd->saveJointParam(idx);
+    });
+
+    return motorTab;
+}
+
 
 
 //selection changed
@@ -196,6 +464,9 @@ void MainWnd::browser_cb(Fl_Widget *w, void *data) {
 }
 
 
+void MainWnd::stop_cb(Fl_Widget* w, void* ) {
+    g_robot_.stop();
+}
 
 void MainWnd::slider_cb(Fl_Widget* w, void* data) {
     int idx = (int)(intptr_t)data;    
@@ -309,9 +580,7 @@ void MainWnd::tabs_cb(Fl_Widget* w, void *data) {
     if ( wnd )
         wnd->UpdateStatusLine();
 }
-
-
-    
+  
 MainWnd::MainWnd(int X, int Y, int W, int H, SyncExchange *gui_rd)
   : Fl_Group(X, Y, W, H) {
     gui_run_data = gui_rd;
@@ -323,6 +592,7 @@ MainWnd::MainWnd(int X, int Y, int W, int H, SyncExchange *gui_rd)
     edit_tab = CreateEditTab(X + TLx, Y + TLy+hTab, TLw, TLh-hTab);
 
     browser_tab = CreateProgramsTab(X + TLx, Y + TLy+hTab, TLw, TLh-hTab);
+    CreateRecordTab(X + TLx, Y + TLy+hTab, TLw, TLh-hTab);
     
    
     tabs->end();
@@ -350,13 +620,20 @@ MainWnd::MainWnd(int X, int Y, int W, int H, SyncExchange *gui_rd)
     Fl_Group *LG = new Fl_Group(X + TLx, Y + LGy,  TRx + TLw - TLx, LGh);
     LG->box(FL_BORDER_FRAME);
     LG->color(FL_GREEN);
-    terminal = new Fl_Terminal(LG->x(), LG->y(), LG->w(), LG->h()-20);  
+    int hTer =  LG->h()- 20;
+    terminal = new Fl_Terminal(LG->x(), LG->y(), LG->w() - hTer - 1 ,hTer);  
     terminal->ansi(true);                 // Разрешить ANSI цвета
     terminal->color(FL_WHITE);          // Установить белый фон
     terminal->textcolor(FL_BLACK);   
-    terminal->activate(); 
+    //terminal->activate();
     LG->resizable(terminal );
-    
+    //Stop button
+    Fl_Button *stop_btn    = new Fl_Button(terminal->x() + terminal->w() + 1 , terminal->y(), hTer, hTer, "STOP");
+    stop_btn->callback(stop_cb, this);
+    stop_btn->color(FL_DARK_RED);
+    stop_btn->labelcolor(FL_WHITE);
+
+    //status line
     statusline = new Fl_Box(LG->x(), LG->y() + LG->h() - 20, LG->w(), 20);
     statusline->box(FL_DOWN_BOX);
     statusline->align( FL_ALIGN_LEFT|FL_ALIGN_INSIDE);
@@ -376,6 +653,15 @@ void MainWnd::configUpdated()
     move_tab = CreateMoveTab(tabs->x(), tabs->y() + hTab, tabs->w(), tabs->w()-hTab);
     tabs->add(move_tab);    
     setFeedback(com_map);
+
+    motor_tab = CreateMotorTab(tabs->x(), tabs->y() + hTab, tabs->w(), tabs->w()-hTab);
+    tabs->add(motor_tab);
+
+       // Заполняем комбобокс именами макросов
+    const auto& macroses = Macroses::getInstance().GetMacros();
+    for (const auto& macro : macroses) {
+        macro_choice->add(macro.name.c_str());
+    }
     
 }
 
@@ -413,10 +699,14 @@ void MainWnd::clear_terminal()
 {
     if  (!terminal )
         return;
-    terminal->clear();
+
+    terminal->reset_terminal();
+    
     terminal->ansi(true);                 // Разрешить ANSI цвета
     terminal->color(FL_WHITE);          // Установить белый фон
-    terminal->textcolor(FL_BLACK);   
+    terminal->textcolor(FL_BLACK); 
+    terminal->redraw();
+
 }
 
 void MainWnd::print_terminal( uint8_t type, std::string &s)
@@ -441,24 +731,12 @@ void MainWnd::print_terminal( uint8_t type, std::string &s)
     Fl::flush();  // применяет обновления немедленно
     */
 }
-/*
-int main(int argc, char **argv) {
-  Fl_Window *window = new Fl_Window(Ww, Wh, "BBRobot UI");
-  window->color(FL_WHITE);
-  g_mainWnd = new MainWnd(0, 0, Ww, Wh);
-  window->end();
-  window->resizable(g_mainWnd);
-  window->size_range(Ww, Wh);
-  window->show(argc, argv);
-  //window->size(Ww + 90, Wh);
-  return Fl::run();
-}
-*/
+
+
+
+
 
 //Status Bar
-
-
-
 StatusBar::StatusBar(int X, int Y, int W, int H, int num_lines)
     : Fl_Box(X, Y, W, H), lines(num_lines) {}
 

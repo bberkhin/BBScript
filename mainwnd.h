@@ -11,9 +11,9 @@
 #include <FL/fl_draw.H>
 #include <FL/Fl_Tabs.H>
 #include <FL/Fl_Hor_Value_Slider.H>
-#include <FL/Fl_Text_Display.H>
 #include <FL/Fl_Terminal.H>
-#include <FL/Fl_Text_Buffer.H>
+#include <FL/Fl_Choice.H>
+#include <FL/Fl_Float_Input.H>
 #include <vector>
 #include <string>
 #include <filesystem>
@@ -89,6 +89,9 @@ private:
     Fl_Group *CreateEditTab(int x, int y,int W, int H);
     Fl_Group *CreateProgramsTab(int x, int y,int W, int H);
     Fl_Group *CreateMoveTab(int x, int y, int W, int H);
+    Fl_Group *CreateRecordTab(int x, int y, int W, int H);
+    Fl_Group *CreateMotorTab(int x, int y, int W, int H);
+    void addMoveButtons(int x, int y,int W, int H, int index);
 public:
     void save_file();
     void run_edit();
@@ -103,6 +106,13 @@ public:
     static void slider_cb(Fl_Widget* w, void* data);
     static void browser_cb(Fl_Widget *w, void *data);
     static void tabs_cb(Fl_Widget* w, void *data);
+    static void stop_cb(Fl_Widget* w, void *data);
+    void motorModified(bool b ) { modified_ = b; }
+    bool motorModified() { return modified_; }
+    bool restoreJointParam(int idx);
+    bool saveJointParam(int idx);
+    int lastMotorChoice() { return last_motor_choice_idx_; }
+    bool saveJointOneParam(JointPtr j, Fl_Float_Input *input, JOINT_MOTOR_PARAM type );
 
 private:
     MyFileBrowser *browser = nullptr;
@@ -112,10 +122,21 @@ private:
     Fl_Group *edit_tab = nullptr;
     Fl_Group *browser_tab = nullptr;
     Fl_Group *move_tab = nullptr;
+    Fl_Group *motor_tab = nullptr;
     Fl_Multiline_Input *editor = nullptr;
+    Fl_Choice *macro_choice= nullptr;
+    Fl_Choice *motor_choice= nullptr;
     Fl_Box *statusline = nullptr;
+    Fl_Float_Input *speedLimit = nullptr;
+    Fl_Float_Input *accLimit   = nullptr;
+    Fl_Float_Input *currentLimit = nullptr;
+    Fl_Float_Input *voltage = nullptr;
+
     std::vector<Fl_Hor_Value_Slider*> sliders;
     std::string selected_file;
+    bool modified_ = false;
+    int last_motor_choice_idx_ = -1;
+    
     static SyncExchange *gui_run_data;
         
 };

@@ -45,13 +45,14 @@ add_executable(main
     ${FLEX_Lexer_OUTPUTS}
     ${BISON_Parser_OUTPUTS}
     mainGUI.cpp
-#    fltkGUI.cpp
+    macroses.cpp
     mainwnd.cpp
     mrobotimpl.cpp
     platform_util.cpp
     motors_facoty.cpp
     pcanimpl.cpp
     canmotorimpl.cpp
+    tracerecoder.cpp
 # CAN Library
     ${SLCAN_SRC}/slcan.c
     ${SLCAN_SRC}/serial.c

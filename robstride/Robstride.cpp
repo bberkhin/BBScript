@@ -155,9 +155,9 @@ bool RobStride_Motor::RobStride_Motor_Analysis(uint8_t *DataFrame,uint32_t ID_Ex
 			}
 			else if (int((ID_ExtId&0x3F000000)>>24) == 17)
 			{
+				uint16_t cur_idx = (DataFrame[1]<<8|DataFrame[0]);
 				for (int index_num = 0; index_num <= 13; index_num++)
-				{
-					uint16_t cur_idx = (DataFrame[1]<<8|DataFrame[0]);
+				{					
 					if (cur_idx == Index_List[index_num]){
 						result = true;
 						switch(index_num)
@@ -211,6 +211,17 @@ bool RobStride_Motor::RobStride_Motor_Analysis(uint8_t *DataFrame,uint32_t ID_Ex
 						}
 					}
 				}
+				if ( !result && cur_idx == 0X7024 )
+				{
+					limit_speed_ = Byte_to_float(DataFrame);
+					result = true;
+				}
+				if ( !result && cur_idx == 0X7024 )
+				{
+					acceleration_ = Byte_to_float(DataFrame);
+					result = true;
+				}
+				
 			}
 			else if ((uint8_t)((ID_ExtId & 0xFF)) == 0xFE)
 			{
@@ -442,8 +453,10 @@ void RobStride_Motor::RobStride_Motor_Pos_control(float Speed, float Angle)
 {
 		Motor_Set_All.set_speed = Speed;
 		Motor_Set_All.set_angle = Angle;
-//		Motor_Set_All.set_limit_speed = vel_max;
-//		Motor_Set_All.set_acceleration = acc_set;
+		Motor_Set_All.set_limit_speed = limit_speed_;
+		Motor_Set_All.set_acceleration = acceleration_;
+
+	
 //		if (drw.run_mode.data != 1 && Pos_Info.pattern == 2)
 		if (drw.run_mode.data != 1)
 		{
@@ -753,8 +766,6 @@ void RobStride_Motor::RobStride_Motor_MIT_MotorModeSet(uint8_t F_CMD)
 	txdata[6] = F_CMD;
 	txdata[7] = 0xFD;	// The meaning of the last byte is unknown, use 0xFD
     sendMsgBuf( CAN_ID, CAN_ID_STD,CAN_RTR_DATA,8,txdata );
-
-
 }
 
 
@@ -821,6 +832,12 @@ void RobStride_Motor::setPosition(float position, float velocity_feedforward)
 	}
 }
 
+bool RobStride_Motor::request_by_index(uint16_t index, uint16_t wait_ms )
+{
+	Get_RobStride_Motor_parameter( index );
+	return wait_answer(1, wait_ms);
+}
+
 bool RobStride_Motor::request(uint16_t what, uint16_t wait_ms )
 {
 	int nufeedbacks = 0;
@@ -839,10 +856,13 @@ bool RobStride_Motor::request(uint16_t what, uint16_t wait_ms )
 		Get_RobStride_Motor_parameter( drw.iqf.index );
 		nufeedbacks++;
 	}
+	return wait_answer(nufeedbacks, wait_ms);
+}
 
-	
-	 if ( nufeedbacks && wait_ms && can_bus_)
-	 {
+bool RobStride_Motor::wait_answer(int nufeedbacks, int16_t wait_ms )
+{
+	if ( nufeedbacks && wait_ms && can_bus_)
+	{
 		uint32_t id;
 		uint8_t len;
 		uint8_t buffer[8];
@@ -855,8 +875,8 @@ bool RobStride_Motor::request(uint16_t what, uint16_t wait_ms )
 					nufeedbacks--;
 			}
 		}
-	 }
-	return true;
+	}
+  	return true;
 }
 
 void RobStride_Motor::setVelocity(float velocity)
@@ -885,14 +905,47 @@ float RobStride_Motor::getVelocity() const
 	return Pos_Info.Speed;	
 }
 
-float RobStride_Motor::getVoltage() const
+
+float RobStride_Motor::getParameter( JOINT_MOTOR_PARAM type )
 {
-	return drw.VBUS.data;
+	switch(type)
+	{
+		case JOINT_MOTOR_SPEEDLIMIT:			
+			request_by_index( 0X7024,  100 );
+			return limit_speed_;
+		case JOINT_MOTOR_ACCLIMIT:
+			request_by_index( 0X7025,  100 );
+			return acceleration_;
+		case JOINT_MOTOR_CURLIMIT:
+			request_by_index( 0X7018,  100 );
+			return drw.limit_cur.data;
+		case JOINT_MOTOR_VOLTAGE:
+		    request( FB_VBUS,  100 );
+			return drw.VBUS.data;
+		case JOINT_MOTOR_CURRENT:			
+			request( FB_IQCURRENT,  100 );
+			return drw.iqf.data;			
+	}
+	return 0.f;
 }
-    //states
-float RobStride_Motor::getIqCurrent() const
+
+// TODO Speed limit 0X7024 or drw.limit_spd.index==0X7017
+void  RobStride_Motor::setParameter( JOINT_MOTOR_PARAM type, float param )
 {
-	return drw.iqf.data;
+	switch(type)
+	{
+		case JOINT_MOTOR_SPEEDLIMIT:		
+			limit_speed_ = param;
+			Set_RobStride_Motor_parameter(0X7024, limit_speed_, Set_parameter);
+			break;	
+		case JOINT_MOTOR_ACCLIMIT:
+			acceleration_ = param;
+			Set_RobStride_Motor_parameter(0X7025, acceleration_, Set_parameter);
+			break;	
+		case JOINT_MOTOR_CURLIMIT:
+			Set_RobStride_Motor_parameter(0X7018, param, Set_parameter);			
+			break;				
+	}
 }
 
 void RobStride_Motor::setCloseLoop()

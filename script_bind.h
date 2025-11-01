@@ -14,9 +14,10 @@ void mr_closeloop(int id);         // IMotorDriver::setCloseLoop() override;
 void mr_setidle(int id);           // IMotorDriver::setStateIdle() override;
 void mr_setmodepos(int id);        // IMotorDriver::setControlModePosition() override;
 void mr_setmodevel(int id);        // IMotorDriver::setControlModeVelocity() override;
-void mr_setpos(int id, double pos);  // IMotorDriver::setTargetPosition(double position) override;
-void mr_setvel(int id, double v);  // IMotorDriver::setTargetVelocity(double velocity) override;
+void mr_setpos(int id, float pos);  // IMotorDriver::setTargetPosition(double position) override;
+void mr_setvel(int id, float v);  // IMotorDriver::setTargetVelocity(double velocity) override;
 void mr_stop();
+void mr_movej( float *pos, float speed);
 extern void mr_delay_ms(int );
 
 #ifdef __cplusplus

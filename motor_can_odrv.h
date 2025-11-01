@@ -7,6 +7,7 @@ class MotorCanOdrive : public CanMotorDriver
 public:
     MotorCanOdrive(uint32_t id = 0);
     virtual ~MotorCanOdrive();
+    const char *getType() const { return "Odrive CAN"; }
     void setPosition(float position, float velocity_feedforward) override;
     void setVelocity(float velocity) override;
     void stop()  override;
@@ -16,9 +17,10 @@ public:
 
     float getPosition() const override;
     float getVelocity() const override;
-    float getVoltage() const override;
-    float getIqCurrent() const override;
     bool request(uint16_t what, uint16_t wait_ms = 0) override;
+
+    float getParameter( JOINT_MOTOR_PARAM type )  override;
+    void  setParameter( JOINT_MOTOR_PARAM type, float param )  override;
 
     //states
     void setCloseLoop() override;
@@ -46,10 +48,14 @@ private:
     float Iq_Measured = 0.0f; // [A]
     float Pos_Estimate = 0.0f; // [rev]
     float Vel_Estimate = 0.0f; // [rev/s]
+    float limit_cur_ = 0.f;
+    float limit_speed_ = 0.f;
+
     uint32_t Active_Errors = 0;
     uint32_t Disarm_Reason = 0;
     uint32_t Axis_Error = 0;
     uint8_t Axis_State = 0;
     uint8_t Procedure_Result = 0;
     uint8_t Trajectory_Done_Flag = 0;
+
 };

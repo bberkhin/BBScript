@@ -5,6 +5,7 @@
 #include <string>
 #include <cstring>
 #include <functional>
+#include <math.h>
 
 #define JOINTS_COUNT 6
 
@@ -70,6 +71,18 @@ struct JointsAngelses
         angles[5] = a6;
         memset(velocity, 0, sizeof(velocity) );
     }
+    JointsAngelses(float *pos, float vel) {
+        memcpy(angles, pos, sizeof(float)*JOINTS_COUNT);
+        if ( isnan(vel) ) {
+            memset(velocity, 0, sizeof(velocity) );
+        }
+        else {
+            for (int i = 0; i < JOINTS_COUNT; i++) {
+                velocity[i] = vel;
+            }
+        }
+     }
+
     float angles[JOINTS_COUNT];
     float velocity[JOINTS_COUNT];
     
@@ -88,11 +101,11 @@ public:
     virtual ~ICollaborativeRobot() = default;
     virtual void movep(const Pose& target) = 0;
     virtual void movej(const JointsAngelses &target) = 0;
+    virtual void enableManualTeachMode(bool enable = true) = 0;
     virtual void stop() = 0;
     virtual void emergencyStop() = 0;
     virtual IRobotModel* getModel() = 0;
     virtual IJointController* getJointController() = 0;
-    virtual const JointsAngelses &getCurrentJointAngles() const = 0;
     
 // todo    virtual IMotionPlanner* getMotionPlanner() = 0;
 // todo    virtual ISensorSuite* getSensors() = 0;
@@ -117,6 +130,7 @@ public:
     virtual JointPtr getJointByIndex(uint8_t index) = 0;
     virtual int getJointsCount() = 0;
     virtual void requestAll( uint16_t what, uint16_t wait_ms )  = 0;
+    virtual void getCurrentJointAngles( JointsAngelses &ja)   = 0;
     // Iterate joints with a functor: non-const and const versions
     virtual void for_each_joint(const JointPtrFunctor &fn) = 0;
    // virtual void for_each_joint_const(const JointPtrFunctor &fn) const = 0;
@@ -127,12 +141,22 @@ public:
 struct JointLimit
 {
     JointLimit() {}
-    JointLimit(float pos_min,float pos_max,float vel_max = 0.0f, float max_torq = 0.0f ) :
-        pos_min_(pos_min), pos_max_(pos_max), vel_max_(vel_max), max_torq_(max_torq)  {}
     float pos_min_ = 0.f;
     float pos_max_ = 0.f;
-    float vel_max_ = 0.f;
-    float max_torq_ = 0.f;
+    float vel_max_ = 8.f;
+    float torq_max_ = 7.f;
+    float acc_max_ = 6.f;
+    float cur_max_ = 10.f;
+};
+
+enum JOINT_MOTOR_PARAM {
+    //read write
+    JOINT_MOTOR_SPEEDLIMIT = 0,
+    JOINT_MOTOR_ACCLIMIT,
+    JOINT_MOTOR_CURLIMIT,
+    //JOINT_MOTOR_RADONLY,
+    JOINT_MOTOR_VOLTAGE,
+    JOINT_MOTOR_CURRENT
 };
 
 class IJoint {
@@ -143,9 +167,15 @@ public:
     virtual void setVelocity(float velocity) = 0;
     virtual void setPosition(float position) = 0;
     virtual IMotorDriver* getMotorDriver() = 0;
-    virtual bool getFeedback( FeedbackJoint *fb) = 0; // joint feedback considering ratio
+    virtual bool getFeedback( FeedbackJoint *fb) const = 0; // joint feedback considering ratio
     virtual const JointLimit& getLimits() const = 0;
     virtual void setLimits( JointLimit& ) = 0;
+    virtual void moveSteps( int steps ) = 0;
+    virtual void setStep( float step_pos ) = 0;
+    virtual const float getStep() = 0;
+    virtual float getParameter( JOINT_MOTOR_PARAM type ) = 0;
+    virtual bool setParameter( JOINT_MOTOR_PARAM type, float param ) = 0;
+    virtual bool isAcceptable(JOINT_MOTOR_PARAM type, float param )  = 0;
 };
 
 
@@ -153,6 +183,7 @@ class IMotorDriver {
 public:
     virtual ~IMotorDriver() = default;
     //virtual uint8_t getId() const = 0;
+    virtual const char *getType() const = 0;
 
     // Управление мотором
     virtual void setPosition(float position, float velocity_feedforward) = 0;
@@ -161,13 +192,14 @@ public:
     virtual void setPosToZero() = 0;
 
 
-    // Чтение состояния мотора
+    // feedback
     virtual float getPosition() const = 0;
-    virtual float getVelocity() const = 0;
-    virtual float getVoltage() const = 0;
-    virtual float getIqCurrent() const = 0;
+    virtual float getVelocity() const = 0;    
     virtual  bool request(uint16_t what, uint16_t wait_ms = 0) = 0; // FB_types
-   // virtual bool   getFeedback(double *pos, double *vel) const = 0;
+
+    // virtual bool   getFeedback(double *pos, double *vel) const = 0;
+    virtual float getParameter( JOINT_MOTOR_PARAM type ) = 0;
+    virtual void  setParameter( JOINT_MOTOR_PARAM type, float param ) = 0;
 
     //states
     virtual void setCloseLoop()  = 0;

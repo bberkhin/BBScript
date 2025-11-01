@@ -18,6 +18,10 @@
 #define CAN_RTR_REMOTE              1// (0x00000002U)  /*!< Remote frame */
 
 
+#define RB_DEFAULT_SPEED 3.0f
+#define RB_DEFAULT_ACC 2.0f
+
+
  #define Set_mode 		 'j'				//Set working mode
  #define Set_parameter 'p'				//Set parameter
  //Control modes
@@ -111,6 +115,7 @@ class RobStride_Motor : public CanMotorDriver
 public:
     RobStride_Motor(uint8_t CAN_Id = 0, bool MIT_Mode = false);
 	 ~RobStride_Motor() = default;
+	const char *getType() const { return "RobStride CAN"; }
 
     void setPosition(float position, float velocity_feedforward) override;
     void setVelocity(float velocity) override;
@@ -120,10 +125,12 @@ public:
 
     float getPosition() const override;
     float getVelocity() const override;
-    float getVoltage() const override;
-	float getIqCurrent() const override;
-	
+  	
     bool request(uint16_t what, uint16_t wait_ms = 0) override;
+	    // virtual bool   getFeedback(double *pos, double *vel) const = 0;
+    float getParameter( JOINT_MOTOR_PARAM type )  override;
+    void  setParameter( JOINT_MOTOR_PARAM type, float param )  override;
+
 
     //states
     void setCloseLoop()  override;
@@ -136,7 +143,9 @@ public:
 
 	bool onCanMessage(uint32_t id, uint8_t len, uint8_t *DataFrame) override;
 private:
-	
+	bool wait_answer(int nufeedbacks, int16_t wait_ms );
+	bool request_by_index(uint16_t index, uint16_t wait_ms );
+
 	void RobStride_Get_CAN_ID();
 	void RobStride_Get_Feedback();
 	void Set_RobStride_Motor_parameter(uint16_t Index, float Value, char Value_mode);
@@ -183,6 +192,8 @@ private:
 	uint64_t Unique_ID = 0;					//64-bit unique MCU identifier
 	Motor_Pos_RobStride_Info Pos_Info;		//Return value
 	data_read_write drw;      						//Parameter structure
+	float limit_speed_ =  RB_DEFAULT_SPEED;
+	float acceleration_ = RB_DEFAULT_ACC; 
 	
 	bool MIT_Mode;			//MIT mode
 	MIT_TYPE MIT_Type;		//MIT mode type

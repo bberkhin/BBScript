@@ -8,7 +8,7 @@
 
 
 
-#define LIMIT_DEFAULT_VEL 10
+#define LIMIT_DEFAULT_VEL 2
 typedef std::vector<JointPtr> JointsList;
 
 class MRobot : public ICollaborativeRobot
@@ -18,12 +18,12 @@ class MRobot : public ICollaborativeRobot
         MRobot( IRobotModel *model, IJointController *jointController );
         ~MRobot() override;
         void movep(const Pose& target) override;
-        void movej(const JointsAngelses &target) override;
+        void movej( const JointsAngelses &target ) override;
+        void enableManualTeachMode(bool enable = true) override;
         void stop() override;
         void emergencyStop() override;
         IRobotModel* getModel() override;
         IJointController* getJointController() override;
-        const JointsAngelses &getCurrentJointAngles() const override;
     public:
         bool Load(const char *urdfdata);
         bool Load( rapidxml::xml_node<>* nd);
@@ -34,7 +34,7 @@ class MRobot : public ICollaborativeRobot
       private:
         RobotModelPtr model_;
         JointControllerPtr jointController_;
-        JointsAngelses currentJointAngles_;
+        mutable JointsAngelses currentJointAngles_;
 };
 
 // Интерфейс описания кинематики/механики робота
@@ -59,11 +59,12 @@ public:
     JointPtr getJointByIndex(uint8_t index) override;
     int getJointsCount() override;
     void requestAll( uint16_t what, uint16_t wait_ms ) override;
+    void getCurrentJointAngles( JointsAngelses &ja)  override;
     // Iterate joints with a functor: non-const and const versions
 public:    
     void for_each_joint(const JointPtrFunctor &fn);
   //  void for_each_joint_const(const JointPtrFunctor &fn) const;
-    JointPtr addJoint(rapidxml::xml_node<>* nd);
+    JointPtr addJoint(rapidxml::xml_node<>* nd);    
 private:
     JointsAngelses targetAngles_;
     JointsList joints_;
@@ -82,11 +83,18 @@ public:
     void setVelocity(float target) override;
     void setPosition(float target) override;
     IMotorDriver* getMotorDriver() override;    
-    bool getFeedback( FeedbackJoint *fb)  override;
-    virtual const JointLimit& getLimits() const override { return limits_; }
-    virtual void setLimits( JointLimit& l ) override;
+    bool getFeedback( FeedbackJoint *fb) const  override;
+    const JointLimit& getLimits() const override { return limits_; }
+    void setLimits( JointLimit& l ) override;
+    void moveSteps( int steps ) override;
+    void setStep( float step_pos ) override;
+    const float getStep() override { return step_pos_; } 
+    float getParameter( JOINT_MOTOR_PARAM type ) override;
+    bool  setParameter( JOINT_MOTOR_PARAM type, float param ) override;
+    bool isAcceptable(JOINT_MOTOR_PARAM type, float param )  override;
 private:
     float velocityJointToMotor(float vel_jnt);
+    float velocityMotorToJoint(float vel_jnt);
     float positionJointToMotor(float pos_jnt);
     bool readLimits( rapidxml::xml_node<> *jnt_node );
 
@@ -96,7 +104,7 @@ private:
     std::string name_;    
     uint8_t index_;
     JointLimit limits_;
-    
-
+    float step_pos_ = 0.1f;  
 };
 
+extern MRobot g_robot_;

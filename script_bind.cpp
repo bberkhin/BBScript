@@ -34,12 +34,13 @@ extern "C" double mr_getvoltag(int id) {
     if ( !motor )
     return 0.0;
     motor->request( FB_VBUS,  100 );
-    return motor->getVoltage();
+    return motor->getParameter( JOINT_MOTOR_VOLTAGE );
+
 }
 
 
 
-extern "C" void mr_setvel(int index, double v) {    
+extern "C" void mr_setvel(int index, float v) {    
     JointPtr jnt = getJointByIndex(index);
     if (  jnt )
         jnt->setVelocity(v);
@@ -81,7 +82,7 @@ extern "C" void mr_setmodevel(int index) {
         motor->setControlModeVelocity();        
 }
 
-extern "C" void mr_setpos(int index, double pos) {
+extern "C" void mr_setpos(int index, float pos) {
     JointPtr jnt = getJointByIndex(index);
     if (  jnt )
         jnt->setPosition(pos);
@@ -114,6 +115,10 @@ extern "C" void mr_delay_ms(int time_ms) {
     delay_ms(time_ms);
 }   
 
-
+extern "C" void mr_movej( float *pos, float vel)
+{
+   JointsAngelses to(pos, vel);
+    g_robot_.movej(to);
+}
 
 

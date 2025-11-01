@@ -102,9 +102,20 @@ void MRobot::movej(const JointsAngelses &target)
     {
         jointController_->setJointTargets(target);
         jointController_->update();
-        currentJointAngles_ = target;
     }
 }
+void MRobot::enableManualTeachMode(bool enable)
+{
+        // setidlemode for each motor driver
+    for_each_joint([](JointPtr &j, uint8_t ){
+        if (!j) return;
+        IMotorDriver *m = j->getMotorDriver();
+        if (m) m->setStateIdle();
+    });
+}
+
+
+
 void MRobot::stop()
 {
     // Stop all motors by iterating joints and calling stop() on each motor driver
@@ -128,10 +139,6 @@ IRobotModel* MRobot::getModel()
 IJointController* MRobot::getJointController()
 {
     return jointController_.get();
-}
-const JointsAngelses &MRobot::getCurrentJointAngles() const
-{
-    return currentJointAngles_;
 }
 
 // MRobot convenience wrappers that forward to the JointController
@@ -169,7 +176,24 @@ void JointController::setJointTargets(const JointsAngelses &targets)
 for_each_joint([&targets](JointPtr &j, uint8_t index ){
         if (!j) return;
         IMotorDriver *m = j->getMotorDriver();
-        if (m) m->setPosition(targets.angles[index], targets.velocity[index] );  } );
+        if (m && !isnan(targets.angles[index]) ) 
+        {
+            m->setPosition(targets.angles[index], targets.velocity[index]); 
+            print_terminal(MSG_TYPE_DEBUG, "move %s to %f", j->getName().c_str(), targets.angles[index] );
+        }
+        } );
+}
+
+void JointController::getCurrentJointAngles( JointsAngelses &ja) {
+
+     for_each_joint([&ja](JointPtr &j, uint8_t index ){
+        if (!j) return;
+        FeedbackJoint fb;
+        j->getFeedback(&fb);
+        ja.angles[index] = fb.pos;
+        ja.velocity[index] = fb.vel;
+        } );
+
 }
 
 void JointController::update()
@@ -264,7 +288,10 @@ Joint::Joint(uint8_t index, rapidxml::xml_node<>* joint_node) :
         motor_id = atoi(xjoint_id->value());
     else
         motor_id++;
-   
+
+     if (auto* xjoint_s = joint_node->first_attribute("step")) 
+        step_pos_ = atof(xjoint_s->value());
+
     // read limits
     readLimits( joint_node );
 
@@ -288,13 +315,29 @@ bool Joint::readLimits( rapidxml::xml_node<> *jnt_node )
         return false;
 
     rapidxml::xml_attribute<> *a = limit_node->first_attribute("lower");
-    limits_.pos_min_ = a ? atof( a->value() ) : 0.f;
+    if ( a ) 
+        limits_.pos_min_ = atof( a->value() );
+   
     a = limit_node->first_attribute("upper");
-    limits_.pos_max_ = a ? atof( a->value() ) : 0.f;
-    a = limit_node->first_attribute("effort");
-    limits_.max_torq_ = a ? atof( a->value() ) : 0.f;
-    a = limit_node->first_attribute("velocity");
-    limits_.vel_max_ = a ? atof( a->value() ) : 0.f;
+    if ( a ) 
+        limits_.pos_max_ = atof( a->value() ) ;
+   
+        a = limit_node->first_attribute("effort");
+    if ( a ) 
+        limits_.torq_max_ = atof( a->value() );
+   
+        a = limit_node->first_attribute("velocity");
+    if ( a ) 
+        limits_.vel_max_ = atof( a->value() );
+    
+        a = limit_node->first_attribute("acc");   
+    if ( a )     
+        limits_.acc_max_ = atof( a->value());
+
+    a = limit_node->first_attribute("current");
+    if ( a ) 
+        limits_.cur_max_ = atof( a->value());
+
     return true;      
 }
 
@@ -303,6 +346,12 @@ float Joint::velocityJointToMotor(float veljnt)
 {
     return veljnt * ratio_;
 }
+
+float Joint::velocityMotorToJoint(float vel_motor)
+{
+    return vel_motor / ratio_;
+}
+
 
 float Joint::positionJointToMotor(float pos_jnt)
 {
@@ -338,7 +387,7 @@ IMotorDriver* Joint::getMotorDriver()
 }
 
 
-bool Joint::getFeedback( FeedbackJoint *fb) 
+bool Joint::getFeedback( FeedbackJoint *fb) const
 {
     fb->index = index_;
     if ( motor_  )
@@ -358,4 +407,58 @@ bool Joint::getFeedback( FeedbackJoint *fb)
 void Joint::setLimits(JointLimit &l)
 {
     limits_ = l;
+}
+
+
+
+void Joint::moveSteps( int steps ) 
+{
+    if ( !motor_ || steps == 0 )
+        return;
+    FeedbackJoint fb;    
+    getFeedback( &fb);
+    setPosition( fb.pos + step_pos_*steps );
+}
+
+void Joint::setStep( float step_pos )
+{
+    if ( step_pos != 0.f)
+        step_pos_ = fabs(step_pos);
+}
+
+
+float Joint::getParameter( JOINT_MOTOR_PARAM type )
+{
+    if ( !motor_ )
+        return 0.f;
+    float param = motor_->getParameter(type);
+    if ( type == JOINT_MOTOR_SPEEDLIMIT || type == JOINT_MOTOR_ACCLIMIT )
+        param = velocityMotorToJoint(param);
+    return param;
+
+}
+bool  Joint::setParameter( JOINT_MOTOR_PARAM type, float param )
+{
+    if ( !motor_ || !isAcceptable(type, param) )
+        return false;
+
+    if ( type == JOINT_MOTOR_SPEEDLIMIT || type == JOINT_MOTOR_ACCLIMIT )
+        param = velocityJointToMotor(param);
+    motor_->setParameter(type, param);
+    return true;
+
+}
+
+bool Joint::isAcceptable(JOINT_MOTOR_PARAM type, float param)
+{
+    switch( type )
+    {
+        case JOINT_MOTOR_SPEEDLIMIT: 
+            return ( param >= 0.1 && param <= limits_.vel_max_ );
+        case JOINT_MOTOR_ACCLIMIT: 
+            return ( param >= 0.1 && param <= limits_.acc_max_ );
+        case JOINT_MOTOR_CURLIMIT:
+            return ( param >= 0.1 && param <= limits_.cur_max_ );
+    }
+    return true;
 }

@@ -79,6 +79,7 @@ bool MotorUARTOdrive::getFeedback(double *pos, double *vel) const
 }
 */
 
+/*
 float MotorUARTOdrive::getVoltage() const
 {
   return odrv_->getParameterAsFloat("vbus_voltage");
@@ -88,7 +89,36 @@ float MotorUARTOdrive::getIqCurrent() const
 {
     return odrv_->getParameterAsFloat("axis0.motor.current_control.Iq_measured");
 }
+*/
 
+float MotorUARTOdrive::getParameter( JOINT_MOTOR_PARAM type )
+{
+
+	switch(type)
+	{
+		case JOINT_MOTOR_SPEEDLIMIT:			        
+		case JOINT_MOTOR_CURLIMIT:
+		case JOINT_MOTOR_ACCLIMIT:
+			return 0.f;
+		case JOINT_MOTOR_VOLTAGE:
+		    return odrv_->getParameterAsFloat("vbus_voltage");
+		case JOINT_MOTOR_CURRENT:			
+			return odrv_->getParameterAsFloat("axis0.motor.current_control.Iq_measured");      
+	}
+  return 0.f;
+}
+
+void  MotorUARTOdrive::setParameter( JOINT_MOTOR_PARAM type, float param )
+{
+  uint8_t buf[8] = {};
+	switch(type)
+	{
+		case JOINT_MOTOR_SPEEDLIMIT:		
+      	case JOINT_MOTOR_CURLIMIT:
+		case JOINT_MOTOR_ACCLIMIT:
+    	break;				
+	}
+}
 
 void MotorUARTOdrive::setCloseLoop()
 {

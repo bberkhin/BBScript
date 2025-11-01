@@ -7,6 +7,7 @@
 #include <rapidxml.hpp>
 #include <rapidxml_utils.hpp>
 #include "pcanimpl.h"
+#include "macroses.h"
 
 
 MRobot g_robot_;
@@ -15,9 +16,8 @@ MRobot g_robot_;
 std::atomic<bool> keep_running = true;
 std::mutex mtx;
 FeedbackGUIData  com_map;
-
-
 TerminalQuery terminal_q; 
+
 
 const char *xmlBuffer =
 "<robot name=\"MyRobot\">"
@@ -163,7 +163,7 @@ bool init_config()
     try
 	{   
         std::string cfg_file = "C:/Projects/BBRobot/BBScript/config.xml";
-        std::string msg("Parse Config: ");
+        std::string msg("Parssing config file: ");
         msg += cfg_file;
         print_terminal(MSG_TYPE_INFO, msg.c_str() );
         rapidxml::file<> xmlFile( cfg_file.c_str() );
@@ -237,6 +237,11 @@ bool init_config()
             return false;
         }
         IMotorDriver::setFeedbackCallback( get_feedback_callback );
+        rapidxml::xml_node<>* nd_macro = root->first_node("macros");
+        if ( nd_macro )
+        {   
+            Macroses::getInstance().Load(nd_macro);
+        }
     }
     catch (const rapidxml::parse_error &e) 
     {
