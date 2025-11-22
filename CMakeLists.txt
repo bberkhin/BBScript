@@ -53,6 +53,8 @@ add_executable(main
     pcanimpl.cpp
     canmotorimpl.cpp
     tracerecoder.cpp
+    feedbackhandler.cpp
+    ak_can_motor.cpp
 # CAN Library
     ${SLCAN_SRC}/slcan.c
     ${SLCAN_SRC}/serial.c

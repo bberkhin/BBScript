@@ -34,8 +34,7 @@ void TraceRecorder::startRecording()
         while (isRecording_) 
         {
             g_robot_.getJointController()->getCurrentJointAngles( angles ); 
-            recordSegment(angles);
-            print_terminal(MSG_TYPE_DEBUG, "Do recording joint1 = %f joint2 = %f", angles.angles[0], angles.angles[1]);
+            recordSegment(angles);  
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
         });
@@ -65,10 +64,10 @@ void TraceRecorder::recordSegment(const JointsAngelses& angles)
     double nowSec = std::chrono::duration<double>(Clock::now().time_since_epoch()).count();
 
     JointsAngelses state = angles;
-
+    double dt = 0;
     if (!trace_.empty()) {
         const TraceSegment& prev = trace_.back();
-        double dt = nowSec - prev.timestamp;
+        dt = nowSec - prev.timestamp;
         if (dt > 0.0) {
             for (size_t i = 0; i < JOINTS_COUNT; ++i) {
                 state.velocity[i] = (angles.angles[i] - prev.state.angles[i]) / dt;
@@ -79,7 +78,7 @@ void TraceRecorder::recordSegment(const JointsAngelses& angles)
             state.velocity[i] = 0.0;
         }
     }
-
+    print_terminal(MSG_TYPE_DEBUG, "Do recording jnt1 = %f vel1 = %f time %f", angles.angles[0], angles.velocity[0], dt);
     trace_.emplace_back(TraceSegment{state, nowSec});
 }
 
@@ -90,7 +89,55 @@ const TraceSegment& TraceRecorder::getSegment(size_t idx) const
 
 void TraceRecorder::playback()
 {
-    for (const auto& seg : trace_) {
-        g_robot_.movej(seg.state);
+
+    if ( isPlaying_ )
+    {
+        print_terminal(MSG_TYPE_DEBUG, "TraceRecorder already playing" );
+        return;
     }
+
+    if ( isRecording_ )
+    {
+        print_terminal(MSG_TYPE_DEBUG, "Can not satrt playing while recording" );
+        return;
+    }
+
+    isPlaying_ = true;
+    g_robot_.enableManualTeachMode(false);
+    
+    if ( trace_.empty() )
+    {
+        //debug
+        TraceSegment tr;
+        tr.state.angles[0] = 2.f;
+        tr.state.velocity[0] = 3.f;
+        trace_.push_back(tr);
+        tr.state.angles[0] = -2.f;
+        tr.state.velocity[0] = 3.f;
+        trace_.push_back(tr);
+    }
+
+    print_terminal(MSG_TYPE_DEBUG, "Start playing!! Segments %d", trace_.size() );
+
+    std::thread playigThread_ = std::thread([this]() {
+        for (const auto& seg : trace_) {
+            if ( !isPlaying_ )
+                break;
+            g_robot_.movej(seg.state);
+            //sleep to get time to start
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            // wait until zero velocity
+            while ( isPlaying_ ) // other process can stop
+            {
+                if ( !g_robot_.getFeedBackHandler()->isMoving() )
+                    break;
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        } 
+        isPlaying_ = false;
+        print_terminal(MSG_TYPE_DEBUG, "Stop playing!! Segments %d", trace_.size() );
+    });
+    
+    playigThread_.detach();
 }

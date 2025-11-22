@@ -244,7 +244,19 @@ static value_t *br_setVel(const node_t *ref, int argc)
 	mr_setvel( id, d);
 	return value_new(VAL_UNDEF);	
 }
-	
+
+static value_t *br_setZero(const node_t *ref, int argc)
+{
+	const value_t *arg0;
+	value_t *v;
+	check_arg_one(ref, "setZero", argc);		
+	arg0 = value_get(argc, 0);
+	check_arg_scalar(ref, "setZero", arg0, 0);
+	int id = value_to_int(arg0);	
+	mr_setzero(id);
+	return value_new(VAL_UNDEF);
+}
+
 
 static value_t *br_stop(const node_t *ref, int argc)
 {
@@ -268,6 +280,7 @@ const builtins_t builtins_robot[] = {
 	{ L"setModeVel",  br_setModeVel },
 	{ L"setPos",      br_setPos },
 	{ L"setVel",      br_setVel },
+	{ L"setZero",     br_setZero },	
 	{ L"sleep",       br_sleep },
 	{ L"stop",        br_stop }
 	

@@ -90,7 +90,7 @@ struct JointsAngelses
 
 struct FeedbackJoint
 {
-    int index;
+    int index = -1;
     float pos = 0;
     float vel = 0;
 };
@@ -123,13 +123,12 @@ public:
 // Интерфейс контроллера суставов
 class IJointController {
 public:
-    virtual ~IJointController() = default;
-    virtual void setJointTargets(const JointsAngelses &targets) = 0;
-    virtual void update() = 0;
+    virtual ~IJointController() = default;    
     virtual JointPtr getJointByMotor( IMotorDriver *p ) = 0;
     virtual JointPtr getJointByIndex(uint8_t index) = 0;
     virtual int getJointsCount() = 0;
     virtual void requestAll( uint16_t what, uint16_t wait_ms )  = 0;
+    virtual void tickAll() = 0;
     virtual void getCurrentJointAngles( JointsAngelses &ja)   = 0;
     // Iterate joints with a functor: non-const and const versions
     virtual void for_each_joint(const JointPtrFunctor &fn) = 0;
@@ -146,7 +145,7 @@ struct JointLimit
     float vel_max_ = 8.f;
     float torq_max_ = 7.f;
     float acc_max_ = 6.f;
-    float cur_max_ = 10.f;
+    float cur_max_ = 25.f;
 };
 
 enum JOINT_MOTOR_PARAM {
@@ -175,6 +174,7 @@ public:
     virtual const float getStep() = 0;
     virtual float getParameter( JOINT_MOTOR_PARAM type ) = 0;
     virtual bool setParameter( JOINT_MOTOR_PARAM type, float param ) = 0;
+    virtual void saveParameter() = 0;
     virtual bool isAcceptable(JOINT_MOTOR_PARAM type, float param )  = 0;
 };
 
@@ -196,10 +196,13 @@ public:
     virtual float getPosition() const = 0;
     virtual float getVelocity() const = 0;    
     virtual  bool request(uint16_t what, uint16_t wait_ms = 0) = 0; // FB_types
+    virtual void  tick() { }
 
     // virtual bool   getFeedback(double *pos, double *vel) const = 0;
     virtual float getParameter( JOINT_MOTOR_PARAM type ) = 0;
     virtual void  setParameter( JOINT_MOTOR_PARAM type, float param ) = 0;
+    virtual void  saveParameter () = 0;
+
 
     //states
     virtual void setCloseLoop()  = 0;

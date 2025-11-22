@@ -18,6 +18,7 @@ void mr_setpos(int id, float pos);  // IMotorDriver::setTargetPosition(double po
 void mr_setvel(int id, float v);  // IMotorDriver::setTargetVelocity(double velocity) override;
 void mr_stop();
 void mr_movej( float *pos, float speed);
+void mr_setzero(int id);
 extern void mr_delay_ms(int );
 
 #ifdef __cplusplus

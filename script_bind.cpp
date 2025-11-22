@@ -82,6 +82,12 @@ extern "C" void mr_setmodevel(int index) {
         motor->setControlModeVelocity();        
 }
 
+extern "C" void mr_setzero(int index) {
+    IMotorDriver *motor = getMotor(index);
+    if (  motor )
+        motor->setPosToZero();        
+}
+
 extern "C" void mr_setpos(int index, float pos) {
     JointPtr jnt = getJointByIndex(index);
     if (  jnt )

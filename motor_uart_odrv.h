@@ -24,6 +24,7 @@ public:
 
     float getParameter( JOINT_MOTOR_PARAM type )  override;
     void  setParameter( JOINT_MOTOR_PARAM type, float param )  override;
+    void  saveParameter () override;
     
     //states
     void setCloseLoop() override;

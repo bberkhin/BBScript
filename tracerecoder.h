@@ -24,6 +24,7 @@ public:
     bool isRunning() { return isRecording_; }
 protected:
     std::atomic<bool> isRecording_ = false;
+    std::atomic<bool> isPlaying_ = false;
     std::vector<TraceSegment> trace_;
     std::thread recordingThread_;
 

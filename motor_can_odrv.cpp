@@ -201,6 +201,13 @@ void  MotorCanOdrive::setParameter( JOINT_MOTOR_PARAM type, float param )
 	}
 }
 
+
+void MotorCanOdrive::saveParameter()
+{
+	//TODO
+}
+
+
 bool MotorCanOdrive::request(uint16_t what, uint16_t wait_ms)
 {
   if  ( !can_bus_ )

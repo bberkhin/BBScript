@@ -948,6 +948,11 @@ void  RobStride_Motor::setParameter( JOINT_MOTOR_PARAM type, float param )
 	}
 }
 
+void  RobStride_Motor::saveParameter()
+{
+	RobStride_Motor_MotorDataSave();
+}
+
 void RobStride_Motor::setCloseLoop()
 {
 	if(MIT_Mode)

@@ -32,8 +32,6 @@ int TLy = 5, LGy = 155, TLh = 145, LGh = 120, LAh = 35, Wh = 280;
 int h_button = 25;// 25+2+2
 int btn_w = 100;
 int hTab = 25;
-extern FeedbackGUIData  com_map;
-
 
 /*
  Fl_Text_Display::Style_Table_Entry stable[] = {
@@ -168,7 +166,7 @@ void MainWnd::addMoveButtons(int x, int y,int W, int H, int index)
             if ( jnt )
                 jnt->moveSteps(-1);
             }, (void*)(intptr_t)index);
-    btn_left->callback([](Fl_Widget* w, void* data) {
+    btn_right->callback([](Fl_Widget* w, void* data) {
             int idx = (int)(intptr_t)data;    
             JointPtr jnt = g_robot_.getJointController()->getJointByIndex(idx);
             if ( jnt )
@@ -183,7 +181,7 @@ void MainWnd::addMoveButtons(int x, int y,int W, int H, int index)
             JointPtr jnt = g_robot_.getJointController()->getJointByIndex(idx);
             if ( jnt && value_str && *value_str )
             {
-                float value = atof(value_str);
+               float value = atof(value_str);
                 if ( value != 0.f)
                     jnt->setStep(value);
 
@@ -268,6 +266,7 @@ Fl_Group *MainWnd::CreateRecordTab(int x, int y, int W, int H)
         }, btn_start);
     
     btn_play->callback([](Fl_Widget *) {
+        g_mainWnd->clear_terminal();
         TraceRecorder *tr = TraceRecorder::getInstance();
         tr->playback();         
         });
@@ -652,7 +651,7 @@ void MainWnd::configUpdated()
 {
     move_tab = CreateMoveTab(tabs->x(), tabs->y() + hTab, tabs->w(), tabs->w()-hTab);
     tabs->add(move_tab);    
-    setFeedback(com_map);
+    updateFeedback();
 
     motor_tab = CreateMotorTab(tabs->x(), tabs->y() + hTab, tabs->w(), tabs->w()-hTab);
     tabs->add(motor_tab);
@@ -665,18 +664,21 @@ void MainWnd::configUpdated()
     
 }
 
-void MainWnd::setFeedback(const FeedbackGUIData  &map_data)
+void MainWnd::updateFeedback()
 {
     int index = 0;
     std::string data;
     if ( !feedback_bar )
         return;
 
-    for (const auto& kv : map_data) 
+    FeedBackHandler *fbh = g_robot_.getFeedBackHandler();
+    IJointController *jcntrl = g_robot_.getJointController();
+    FeedbackJoint fb;
+    for( int i = 0; i < jcntrl->getJointsCount(); i++ )
     {
-        const std::string& key = kv.first;
-        const FeedbackJoint& fb = kv.second;
-        data = key;
+        JointPtr j = jcntrl->getJointByIndex(i);
+        fbh->getFeedback(i, &fb);
+        data = j->getName();
         data += ": Pos: ";
         data += std::to_string(fb.pos);
         data += " Vel: ";

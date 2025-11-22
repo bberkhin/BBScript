@@ -120,6 +120,12 @@ void  MotorUARTOdrive::setParameter( JOINT_MOTOR_PARAM type, float param )
 	}
 }
 
+void MotorUARTOdrive::saveParameter()
+{
+   odrv_->setParameter( "config.save()","" );
+}
+
+
 void MotorUARTOdrive::setCloseLoop()
 {
     odrv_->setState(AXIS_STATE_CLOSED_LOOP_CONTROL);

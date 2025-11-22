@@ -9,13 +9,13 @@
 
 
 
-MRobot::MRobot()
+MRobot::MRobot() : fbhandler_(this)
 {
     model_ = std::make_shared<RobotModel>();
     jointController_ = std::make_shared<JointController>();
 } 
 
-MRobot::MRobot(IRobotModel *model, IJointController *jointController)
+MRobot::MRobot(IRobotModel *model, IJointController *jointController) : fbhandler_(this)
 {
     model_.reset(model);
     jointController_.reset(jointController);    
@@ -98,19 +98,30 @@ void MRobot::movep(const Pose & )///target)
 
 void MRobot::movej(const JointsAngelses &target)
 {
-    if(jointController_)
-    {
-        jointController_->setJointTargets(target);
-        jointController_->update();
-    }
+    for_each_joint([&target](JointPtr &j, uint8_t index ){
+        if (!j || isnan(target.angles[index])  )
+            return;
+        j->setPosition( target.angles[index] );
+        print_terminal(MSG_TYPE_DEBUG, "move %s to %f", j->getName().c_str(), target.angles[index] );
+        } );
+
 }
 void MRobot::enableManualTeachMode(bool enable)
 {
         // setidlemode for each motor driver
-    for_each_joint([](JointPtr &j, uint8_t ){
+    for_each_joint([enable](JointPtr &j, uint8_t ){
         if (!j) return;
         IMotorDriver *m = j->getMotorDriver();
-        if (m) m->setStateIdle();
+        if ( m )
+        {
+            if ( enable ) { 
+                m->setStateIdle(); 
+            }
+            else {
+                m->setCloseLoop();
+                m->setControlModePosition();
+            }
+        }
     });
 }
 
@@ -171,18 +182,6 @@ JointController::JointController()
 {
 }
 
-void JointController::setJointTargets(const JointsAngelses &targets)
-{
-for_each_joint([&targets](JointPtr &j, uint8_t index ){
-        if (!j) return;
-        IMotorDriver *m = j->getMotorDriver();
-        if (m && !isnan(targets.angles[index]) ) 
-        {
-            m->setPosition(targets.angles[index], targets.velocity[index]); 
-            print_terminal(MSG_TYPE_DEBUG, "move %s to %f", j->getName().c_str(), targets.angles[index] );
-        }
-        } );
-}
 
 void JointController::getCurrentJointAngles( JointsAngelses &ja) {
 
@@ -194,10 +193,6 @@ void JointController::getCurrentJointAngles( JointsAngelses &ja) {
         ja.velocity[index] = fb.vel;
         } );
 
-}
-
-void JointController::update()
-{
 }
 
 void JointController::for_each_joint(const JointPtrFunctor &fn)
@@ -257,6 +252,17 @@ void JointController::requestAll( uint16_t what, uint16_t wait_ms )
             mtr->request(what, wait_ms);
     }
 }
+
+void JointController::tickAll()
+{
+    for ( auto jnt : joints_ )
+    {
+        IMotorDriver *mtr = jnt->getMotorDriver();
+        if ( mtr )
+            mtr->tick();
+    }
+}
+
 
 //////////////////////////////////////////////////////
 // Joint implementation
@@ -449,6 +455,12 @@ bool  Joint::setParameter( JOINT_MOTOR_PARAM type, float param )
 
 }
 
+void Joint::saveParameter()
+{
+    if ( motor_ )
+        motor_->saveParameter();
+}
+
 bool Joint::isAcceptable(JOINT_MOTOR_PARAM type, float param)
 {
     switch( type )
@@ -462,3 +474,4 @@ bool Joint::isAcceptable(JOINT_MOTOR_PARAM type, float param)
     }
     return true;
 }
+

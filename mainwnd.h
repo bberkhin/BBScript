@@ -29,7 +29,7 @@
 #define MAX_JOINTS 6
 
 namespace fs = std::filesystem;
-typedef std::map<std::string, FeedbackJoint> FeedbackGUIData;
+
 
 
 
@@ -98,7 +98,7 @@ public:
     void run_file();
     void new_file();
     void edit_file();
-    void setFeedback(const FeedbackGUIData  &map_data);
+    void updateFeedback();
     void UpdateStatusLine();
     void show_editor(const std::string& filename, bool is_new);
     void print_terminal(uint8_t type, std::string &s);
@@ -141,46 +141,6 @@ private:
         
 };
 
-/*
-class FileManager : public Fl_Window 
-{
-    enum Mode { modeLIST, modeEDIT } mode = modeLIST;
-public:
-    FileManager(int W, int H, SyncExchange *g_r_d, const char*L = 0);
-    void setMode(Mode md);
-    void UpdateStatus(int ln);
-    void setStatusText(int i, const char *s);
-    void update_file_list();
-    void resize(int X, int Y, int W, int H) override;
-    void show_editor(const std::string& filename, bool is_new = false);
-    void hide_editor();
-    void save_file();
-    void setFeedback(const FeedbackGUIData  &data);
-
-    Fl_Group *CreateProgrammTab(int x, int y,int H, int W);
-    Fl_Group *CreatMoveTab(int x, int y, int H, int W);
-
-    static void browser_cb(Fl_Widget *w, void *data);
-    static void run_cb(Fl_Widget*, void *data);
-    static void edit_cb(Fl_Widget*, void *data);
-    static void close_cb(Fl_Widget *, void *data);
-    static void new_cb(Fl_Widget*, void *data);
-    static void save_cb(Fl_Widget*, void *data);
-    static void slider_cb(Fl_Widget* w, void* data);
-
-
-private:
-    MyFileBrowser *browser;
-    Fl_Button *run_btn, *close_btn, *edit_btn, *new_btn, *save_btn;
-    Fl_Multiline_Input *editor;
-    StatusBar *status_bar;
-    StatusBar *feedback_bar;
-    Fl_Tabs *tabs;
-    std::vector<Fl_Hor_Value_Slider*> sliders;
-    std::string selected_file;
-    static SyncExchange *gui_run_data;
-};
-*/
 extern MRobot g_robot_;
 extern MainWnd *g_mainWnd;
 

@@ -14,8 +14,6 @@ MRobot g_robot_;
 
 
 std::atomic<bool> keep_running = true;
-std::mutex mtx;
-FeedbackGUIData  com_map;
 TerminalQuery terminal_q; 
 
 
@@ -77,31 +75,13 @@ void programm_thread_runner(SyncExchange& exchange)
 }
 
 
-void feedback_reader_thread() 
-{
-    int index = 1;
-    IJointController* jctrl = g_robot_.getJointController();    
-    PCanImpl *can = PCanImpl::getGlobalCan();
-    double pos = 0, vel = 0;
-    while (keep_running) {       
-        if ( jctrl )
-        {
-            if ( can->isOpen() )
-                 g_robot_.pumpEvents(can);
-            
-            jctrl->requestAll(FB_POSITION, 0);  
-        }
-        // Чтобы уменьшить нагрузку
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    }
-}
 
 void update_display_cb(void*) {
     std::queue<terminal_msg> local_queue;
     
     // Копируем все сообщения под защитой мьютекса
     {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::mutex> lock(terminal_q.mtx);
         local_queue.swap(terminal_q.messages);
     }
     
@@ -117,10 +97,8 @@ void update_display_cb(void*) {
 void timer_callback(void*) 
 {
     //check feedback
-    {
-        std::lock_guard<std::mutex> lock(mtx);
-        g_mainWnd->setFeedback(com_map);
-    }
+    g_mainWnd->updateFeedback();
+
     //check terminal
     {
         std::lock_guard<std::mutex> lock(terminal_q.mtx);
@@ -130,30 +108,6 @@ void timer_callback(void*)
     Fl::repeat_timeout(0.05, timer_callback); // каждые 50 мс
 }
 
-void init_feedback_data()
-{
-    FeedbackJoint data;
-    IJointController* jctrl = g_robot_.getJointController();     
-    std::lock_guard<std::mutex> lock(mtx);    
-    for( data.index = 0; data.index < jctrl->getJointsCount(); data.index++) {
-        JointPtr jnt = jctrl->getJointByIndex(data.index);
-        com_map[ jnt->getName() ] = data;
-    }    
-}
-
-void get_feedback_callback(IMotorDriver *motor,  uint16_t type)
-{ 
-    IJointController* jctrl = g_robot_.getJointController();   
-    JointPtr jnt = jctrl->getJointByMotor(motor);
-    if ( jnt && (type&FB_POSITION) )
-    {
-        FeedbackJoint data;
-        jnt->getFeedback(&data);      
-        std::lock_guard<std::mutex> lock(mtx);
-        com_map[ jnt->getName() ] = data;
-
-    }
-}
 
 
 #define DEFAULT_COM_PORT "COM5"
@@ -236,7 +190,7 @@ bool init_config()
             fatal_error("Failed to load robot from URDF");
             return false;
         }
-        IMotorDriver::setFeedbackCallback( get_feedback_callback );
+        
         rapidxml::xml_node<>* nd_macro = root->first_node("macros");
         if ( nd_macro )
         {   
@@ -276,19 +230,19 @@ int main(int argc, char **argv) {
     	fatal_error("Failed to initialize parser\n");
 		return 1;
 	}
-    init_feedback_data();
+    
     g_mainWnd->configUpdated();
 
     std::thread programm_thread( programm_thread_runner, std::ref(gui_run_data) ); 
     //feedback thread
-    std::thread reader(feedback_reader_thread);  
+    g_robot_.getFeedBackHandler()->start();
+    
     Fl::add_timeout(0.05, timer_callback); // Пуск таймера
 
     
     int err = Fl::run();
     
     keep_running = false;
-    reader.join();  
 
     {
         std::unique_lock<std::mutex> lock(gui_run_data.mtx);

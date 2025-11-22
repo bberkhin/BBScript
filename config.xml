@@ -2,8 +2,9 @@
     <nocom port="COM5" bound="115200"/>
     <can port="COM6" />
     <robot name="MyRobot">
-        <joint name="Joint1" motor="can_robstride" id="1" ratio="1" step = "0.2" />
-        <joint name="Joint2" motor="can_odrv" id="2" ratio="1"  step = "0.13">
+        <joint name="Joint1" motor="can_cubemars" id="3" ratio="1" step = "0.2" />
+        <ojoint name="Joint2" motor="can_robstride" id="1" ratio="1" step = "0.2" />
+        <otjoint name="Joint3" motor="can_odrv" id="2" ratio="1"  step = "0.13">
             <limit lower="-1" upper="1" effort="10" velocity="2"/>
         </joint>
         <jjjoint name="Joint2" motor="uart_odrv" id="3" ratio="1" />    
@@ -18,8 +19,7 @@ closeLoop(0);
 setPos(0,0);
         </macro>
         <macro label="Vel control">
-setModeVel(-1);
-closeLoop(-1);
+setVel(0,10.0);
         </macro>
         <macro label="GoTo Zero">
 setModePos(-1);

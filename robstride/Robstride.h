@@ -130,6 +130,7 @@ public:
 	    // virtual bool   getFeedback(double *pos, double *vel) const = 0;
     float getParameter( JOINT_MOTOR_PARAM type )  override;
     void  setParameter( JOINT_MOTOR_PARAM type, float param )  override;
+	void  saveParameter () override;
 
 
     //states

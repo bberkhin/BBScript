@@ -5,6 +5,7 @@
 #include <vector>
 #include <functional>
 #include <rapidxml.hpp>
+#include "feedbackhandler.h"
 
 
 
@@ -24,6 +25,7 @@ class MRobot : public ICollaborativeRobot
         void emergencyStop() override;
         IRobotModel* getModel() override;
         IJointController* getJointController() override;
+        FeedBackHandler * getFeedBackHandler() { return &fbhandler_; }
     public:
         bool Load(const char *urdfdata);
         bool Load( rapidxml::xml_node<>* nd);
@@ -35,6 +37,7 @@ class MRobot : public ICollaborativeRobot
         RobotModelPtr model_;
         JointControllerPtr jointController_;
         mutable JointsAngelses currentJointAngles_;
+        FeedBackHandler fbhandler_;
 };
 
 // Интерфейс описания кинематики/механики робота
@@ -53,12 +56,11 @@ class JointController : public IJointController
 public:
     JointController();
     virtual ~JointController() = default;
-    void setJointTargets(const JointsAngelses &targets) override;
-    void update() override;
     JointPtr getJointByMotor(IMotorDriver *p) override;    
     JointPtr getJointByIndex(uint8_t index) override;
     int getJointsCount() override;
     void requestAll( uint16_t what, uint16_t wait_ms ) override;
+    void tickAll()  override;
     void getCurrentJointAngles( JointsAngelses &ja)  override;
     // Iterate joints with a functor: non-const and const versions
 public:    
@@ -91,6 +93,7 @@ public:
     const float getStep() override { return step_pos_; } 
     float getParameter( JOINT_MOTOR_PARAM type ) override;
     bool  setParameter( JOINT_MOTOR_PARAM type, float param ) override;
+    void  saveParameter() override;
     bool isAcceptable(JOINT_MOTOR_PARAM type, float param )  override;
 private:
     float velocityJointToMotor(float vel_jnt);
